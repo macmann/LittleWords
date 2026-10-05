@@ -24,28 +24,32 @@ The current cloud workspace has an initialized local PostgreSQL instance. Its ig
 
 ## Commands
 
-| Command               | Purpose                                                      |
-| --------------------- | ------------------------------------------------------------ |
-| `npm install`         | Install dependencies using the committed lockfile            |
-| `npm run dev`         | Start Next.js development server                             |
-| `npx prisma generate` | Generate the typed database client                           |
-| `npm run db:migrate`  | Apply the committed PostgreSQL migration                     |
-| `npm run db:seed`     | Create demo content/profile without overwriting parent edits |
-| `npm test`            | Run deterministic session-generation tests                   |
-| `npm run build`       | Generate Prisma client, type-check, and build production app |
-| `npm start`           | Run the production build                                     |
+| Command                  | Purpose                                                                     |
+| ------------------------ | --------------------------------------------------------------------------- |
+| `npm install`            | Install dependencies using the committed lockfile                           |
+| `npm run dev`            | Start Next.js development server                                            |
+| `npx prisma generate`    | Generate the typed database client                                          |
+| `npm run db:migrate`     | Apply the committed PostgreSQL migration                                    |
+| `npm run db:seed`        | Create demo content/profile without overwriting parent edits                |
+| `npm test`               | Run session-generation and deployment tests                                 |
+| `npm run build`          | Generate Prisma client, type-check, and build production app                |
+| `npm run deploy:prepare` | Validate hosting settings, apply migrations, and seed without starting HTTP |
+| `npm run deploy:start`   | Prepare the database/uploads and start the hosted service on `$PORT`        |
+| `npm start`              | Run the production build                                                    |
 
 For a new schema change in a separate development task, use `npx prisma migrate dev --name descriptive_name` and commit the generated migration. Deployments use `migrate deploy`, never `db push` or destructive resets. Seeding can be repeated: existing phrases, statuses, settings, custom cards, and exposure counts are retained.
 
 ## Environment variables
 
-| Variable                | Purpose                                                                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`          | PostgreSQL connection string; unset enables the read-only demo                                |
-| `STORAGE_PROVIDER`      | `local` (default); another provider requires a PhotoStorage adapter                           |
-| `TTS_PROVIDER`          | `none`; reserved for a future server-side provider, not used to call an API                   |
-| `PARENT_PIN`            | A 4–8 digit parent PIN; development defaults to `2468`; production requires an explicit value |
-| `PARENT_SESSION_SECRET` | Random secret of at least 32 characters for signed parent cookies; required in production     |
+| Variable                | Purpose                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`          | PostgreSQL connection string; unset enables the read-only demo                                      |
+| `UPLOAD_DIR`            | Absolute persistent upload directory in hosting; unset keeps `public/uploads` for local development |
+| `APP_ORIGIN`            | Optional canonical public HTTPS origin for parent requests behind a proxy                           |
+| `STORAGE_PROVIDER`      | `local` (default); another provider requires a PhotoStorage adapter                                 |
+| `TTS_PROVIDER`          | `none`; reserved for a future server-side provider, not used to call an API                         |
+| `PARENT_PIN`            | A 4–8 digit parent PIN; development defaults to `2468`; production requires an explicit value       |
+| `PARENT_SESSION_SECRET` | Random secret of at least 32 characters for signed parent cookies; required in production           |
 
 Generate the session secret with a secure random tool and save it directly in your local environment or secret manager. Never commit `.env`. The sample PIN is for household development; change it before sharing. Parent sessions expire after 30 minutes, use HttpOnly/SameSite cookies, and are locked when learning begins. Parent writes check the gate on the server and enforce same-origin requests. The gate uses a basic single-process attempt limit.
 
@@ -82,7 +86,7 @@ Seed paths use `/images/<category>/<slug>.svg`. Place files in `public/images`; 
 
 **My world** lets parents upload JPG/PNG/WebP photos (up to 5 MB), enter curated phrases for English, Burmese, and German, choose a category, and save personalized concepts. The new card belongs to the child and is eligible for sessions. Mark it Knows in My words to prioritize expansion. Give it a unique identifier such as `my-blue-truck`.
 
-`lib/storage/index.ts` defines the `PhotoStorage` interface. The local adapter stores UUID-named files in ignored `public/uploads/` and serves validated filenames through `/api/photos/...`. Uploads require the parent gate and validate file signatures. Back up uploads and the database together. Restarting a deployment with an ephemeral filesystem loses uploaded photos; use persistent storage or implement an S3-compatible adapter before hosting. Image cleanup after unused uploads and private signed delivery are future work. Photo metadata stripping is not implemented.
+`lib/storage/index.ts` defines the `PhotoStorage` interface. The local adapter stores UUID-named files in `UPLOAD_DIR` (or ignored `public/uploads/` during local development) and serves validated filenames through `/api/photos/...`. Uploads require the parent gate and validate file signatures. Back up uploads and the database together. Restarting a deployment with an ephemeral filesystem loses uploaded photos; use the configured persistent disk/volume described in [deployment instructions](docs/deployment.md), or implement an S3-compatible adapter before horizontal scaling. Image cleanup after unused uploads and private signed delivery are future work. Photo metadata stripping is not implemented.
 
 ## Audio
 
@@ -114,6 +118,14 @@ public/              local artwork, icons, manifest, offline shell
 
 API validation uses Zod. Known Prisma errors produce usable conflict/not-found messages; database failures give retryable messages without returning credentials or raw SQL. Parent-only writes are checked on the server. No analytics dashboard or external API is required.
 
+## Render and Coolify
+
+Both platforms are supported using native Node build/start commands. [Deployment instructions](docs/deployment.md) cover Render's `render.yaml` Blueprint and Coolify's `nixpacks.toml`, PostgreSQL, durable photo storage, secrets, health checks, and redeployment. No Dockerfile is required in this repository; Coolify manages its own containers through Nixpacks.
+
+Hosted services use `npm run deploy:start`: validate runtime settings, verify a writable upload mount, apply Prisma migrations, idempotently seed content, then listen on `0.0.0.0:$PORT`. Required variables are `DATABASE_URL`, `PARENT_PIN`, `PARENT_SESSION_SECRET`, and an absolute `UPLOAD_DIR` on persistent storage. The Render Blueprint provisions paid PostgreSQL and a disk-backed single web-service instance. Nothing is provisioned just by committing these files.
+
+`/api/health` returns 200 only when the database/profile and upload directory are available. Parent cookies are always Secure in production; optional `APP_ORIGIN` handles proxies with rewritten Host headers without trusting arbitrary forwarded headers.
+
 ## Production and validation
 
 Configure PostgreSQL and the parent-security variables, apply migrations, seed, then:
@@ -123,6 +135,6 @@ npm run build
 npm start
 ```
 
-Eleven domain tests cover selection ratios, language availability, sparse categories, disabled concepts, finite length, duplicates, deterministic output, and parent-controlled progression. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. See the final task report for actual results; running these commands is necessary on a new deployment.
+Eleven domain tests cover selection ratios, language availability, sparse categories, disabled concepts, finite length, duplicates, deterministic output, and parent-controlled progression. Three deployment tests cover runtime configuration, proxy origins, and external photo storage. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. See the final task report for actual results; running these commands is necessary on a new deployment.
 
 Current boundaries: single household/child, illustrative seed images, Burmese editorial review, no bundled recordings, basic offline shell only, local upload storage, and no parent-account authentication. Suggested next steps are native-language review, clear object photos and recorded audio, more curated descriptor combinations, an S3 adapter, household authentication/data deletion, and deliberately finite offline sessions. Keep parent-child interaction central as the app grows.

@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+import { sameOrigin } from "@/lib/http/origin";
 const devSecret = randomBytes(32).toString("hex");
 function secret() {
   const value = process.env.PARENT_SESSION_SECRET;
@@ -37,7 +38,7 @@ export async function parentAuthorized() {
 export async function protectParent() {
   const h = await headers();
   const origin = h.get("origin");
-  if (origin && new URL(origin).host !== h.get("host"))
+  if (!sameOrigin(origin, h.get("host")))
     return NextResponse.json(
       { error: "Please use the app to make this change." },
       { status: 403 },

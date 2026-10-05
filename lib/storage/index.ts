@@ -5,8 +5,13 @@ export interface PhotoStorage {
   save(data: Buffer, extension: string): Promise<string>;
   read(name: string): Promise<Buffer>;
 }
-class LocalStorage implements PhotoStorage {
-  private root = path.join(process.cwd(), "public", "uploads");
+export function uploadDirectory() {
+  return path.resolve(
+    process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads"),
+  );
+}
+export class LocalStorage implements PhotoStorage {
+  private root = uploadDirectory();
   async save(data: Buffer, extension: string) {
     await mkdir(this.root, { recursive: true });
     const name = `${randomUUID()}.${extension}`;

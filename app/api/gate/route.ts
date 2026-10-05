@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parentToken, pinMatches, protectParent } from "@/lib/parent-auth";
+import { sameOrigin } from "@/lib/http/origin";
 const attempts = new Map<string, { count: number; until: number }>();
 export async function POST(req: NextRequest) {
   const origin = req.headers.get("origin");
-  if (origin && new URL(origin).host !== req.headers.get("host"))
+  if (!sameOrigin(origin, req.headers.get("host")))
     return NextResponse.json(
       { error: "Please open the gate in the app." },
       { status: 403 },
@@ -40,7 +41,9 @@ export async function POST(req: NextRequest) {
     res.cookies.set("lw-parent", parentToken(), {
       httpOnly: true,
       sameSite: "strict",
-      secure: req.nextUrl.protocol === "https:",
+      secure:
+        process.env.NODE_ENV === "production" ||
+        req.nextUrl.protocol === "https:",
       path: "/",
       maxAge: 1800,
     });
