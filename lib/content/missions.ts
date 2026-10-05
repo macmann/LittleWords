@@ -47,6 +47,10 @@ export const missions: { type: MissionType; text: Record<Language, string> }[] =
 export const childCopy: Record<
   Language,
   {
+    path: string;
+    yourTurn: string;
+    together: string;
+    giveTurn: string;
     listen: string;
     next: string;
     back: string;
@@ -60,6 +64,10 @@ export const childCopy: Record<
   }
 > = {
   EN: {
+    path: "Back to mission path",
+    yourTurn: "Your turn. A look, a point, or a word is welcome.",
+    together: "Say it together",
+    giveTurn: "Give them a turn",
     listen: "Listen",
     next: "Next",
     back: "Back",
@@ -72,6 +80,10 @@ export const childCopy: Record<
     look: "Look, listen, and say it together.",
   },
   DE: {
+    path: "Zum Missionspfad",
+    yourTurn: "Du bist dran. Schau, zeig oder sag etwas.",
+    together: "Zusammen sprechen",
+    giveTurn: "Deine Runde",
     listen: "Anhören",
     next: "Weiter",
     back: "Zurück",
@@ -84,6 +96,10 @@ export const childCopy: Record<
     look: "Schaut, hört und sprecht zusammen.",
   },
   MY: {
+    path: "မစ်ရှင်လမ်းကြောင်းကို ပြန်မယ်",
+    yourTurn: "ကိုယ့်အလှည့်ပါ။ ကြည့်၊ လက်ညှိုးထိုးပြ ဒါမှမဟုတ် ပြောလို့ရတယ်။",
+    together: "အတူတူ ပြောမယ်",
+    giveTurn: "ကိုယ့်အလှည့်",
     listen: "နားထောင်မယ်",
     next: "နောက်တစ်ခု",
     back: "ပြန်မယ်",

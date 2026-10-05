@@ -17,21 +17,50 @@ export async function GET() {
         },
         { status: 503 },
       );
-    const [categories, concepts, vocabulary] = await Promise.all([
-      db.category.findMany({ orderBy: { sortOrder: "asc" } }),
-      db.concept.findMany({
-        where: { OR: [{ childId: null }, { childId: profile.id }] },
-        include: { translations: true },
-        orderBy: { slug: "asc" },
-      }),
-      db.childVocabulary.findMany({ where: { childId: profile.id } }),
-    ]);
+    const [categories, concepts, vocabulary, credential, progress] =
+      await Promise.all([
+        db.category.findMany({ orderBy: { sortOrder: "asc" } }),
+        db.concept.findMany({
+          where: { OR: [{ childId: null }, { childId: profile.id }] },
+          include: { translations: true },
+          orderBy: { slug: "asc" },
+        }),
+        db.childVocabulary.findMany({ where: { childId: profile.id } }),
+        db.parentCredential.findUnique({
+          where: { id: "household" },
+          select: { id: true },
+        }),
+        db.missionProgress.findMany({
+          where: { childId: profile.id },
+          include: {
+            session: {
+              select: {
+                completedAt: true,
+                cards: { select: { seenAt: true } },
+              },
+            },
+          },
+        }),
+      ]);
     return NextResponse.json({
       profile,
       categories,
       concepts,
       vocabulary,
       demo: false,
+      security: {
+        configured: !!credential,
+        legacyPinRequired: !credential && !!process.env.PARENT_PIN,
+      },
+      missionProgress: progress.map((p) => ({
+        missionId: p.missionId,
+        language: p.language,
+        completedAt: p.completedAt,
+        readyToConfirm:
+          !!p.session?.completedAt &&
+          p.session.cards.length > 0 &&
+          p.session.cards.every((c) => !!c.seenAt),
+      })),
     });
   } catch (e) {
     return apiError(e);

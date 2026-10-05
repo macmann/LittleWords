@@ -9,7 +9,6 @@ import { LocalStorage } from "../lib/storage";
 
 const env = {
   DATABASE_URL: "postgresql://test:private-password@db:5432/littlewords",
-  PARENT_PIN: "1234",
   PARENT_SESSION_SECRET: "s".repeat(32),
   UPLOAD_DIR: "/app-data/uploads",
 };
@@ -19,7 +18,6 @@ test("hosted startup accepts the platform port and rejects missing prerequisites
   assert.equal(deploymentConfig(env).port, 3000);
   for (const key of [
     "DATABASE_URL",
-    "PARENT_PIN",
     "PARENT_SESSION_SECRET",
     "UPLOAD_DIR",
   ] as const) {

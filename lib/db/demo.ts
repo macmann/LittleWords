@@ -8,6 +8,8 @@ import type { Bootstrap } from "@/types";
 export function demoData(): Bootstrap {
   return {
     demo: true,
+    security: { configured: false, legacyPinRequired: false },
+    missionProgress: [],
     categories,
     concepts,
     profile: {
@@ -16,6 +18,7 @@ export function demoData(): Bootstrap {
       primaryLanguage: "EN",
       enabledLanguages: ["EN", "MY", "DE"],
       cardsPerSession: 10,
+      practiceLevel: 0,
     },
     vocabulary: concepts.map((c) => ({
       conceptId: c.id,

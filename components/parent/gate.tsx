@@ -8,7 +8,7 @@ export function ParentGate({
   onClose: () => void;
   onOpen: () => void;
 }) {
-  const [pin, setPin] = useState(""),
+  const [password, setPassword] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -39,7 +39,7 @@ export function ParentGate({
           <LockKeyhole size={30} />
         </div>
         <h2 id="gate-title">A space for grown-ups</h2>
-        <p>Enter your parent PIN to manage words, photos, and settings.</p>
+        <p>Enter your parent password to manage words, photos, and settings.</p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -49,7 +49,7 @@ export function ParentGate({
               const res = await fetch("/api/gate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ pin }),
+                body: JSON.stringify({ password }),
               });
               const json = await res.json();
               if (!res.ok) throw new Error(json.error);
@@ -61,18 +61,16 @@ export function ParentGate({
             }
           }}
         >
-          <label htmlFor="parent-pin">Parent PIN</label>
+          <label htmlFor="parent-password">Parent password</label>
           <input
             ref={input}
-            id="parent-pin"
+            id="parent-password"
             type="password"
-            inputMode="numeric"
-            pattern="[0-9]{4,8}"
-            maxLength={8}
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            maxLength={128}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             required
-            autoComplete="off"
+            autoComplete="current-password"
           />
           {error && (
             <p role="alert" className="form-error">
@@ -84,10 +82,6 @@ export function ParentGate({
             <ArrowRight size={19} />
           </button>
         </form>
-        <small>
-          For a fresh local setup, the demo PIN is 2468. Change it in your
-          environment settings.
-        </small>
       </section>
     </div>
   );

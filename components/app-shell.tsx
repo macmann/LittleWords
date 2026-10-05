@@ -17,6 +17,7 @@ import {
   Leaf,
   Check,
   RefreshCw,
+  Route,
 } from "lucide-react";
 import type { Bootstrap, Session, Language } from "@/types";
 import { CategoryIcon } from "./icons";
@@ -25,8 +26,11 @@ import { ParentGate } from "./parent/gate";
 import { VocabularyManager } from "./parent/words";
 import { ContentEditor } from "./parent/content-editor";
 import { Settings } from "./parent/settings";
+import { MissionTrack } from "./parent/mission-track";
+import { FirstRunSetup } from "./parent/password-form";
 import { audioService } from "@/lib/audio/service";
-type Page = "home" | "words" | "categories" | "world" | "parent" | "admin";
+type Page =
+  "home" | "words" | "categories" | "world" | "parent" | "admin" | "track";
 const nav: {
   page: Page;
   label: string;
@@ -35,6 +39,7 @@ const nav: {
 }[] = [
   { page: "home", label: "Home", icon: House },
   { page: "words", label: "My words", icon: BookOpen, parent: true },
+  { page: "track", label: "Missions", icon: Route },
   { page: "categories", label: "Categories", icon: Shapes },
   { page: "world", label: "My world", icon: Camera, parent: true },
 ];
@@ -44,6 +49,9 @@ export function AppShell() {
     [page, setPage] = useState<Page>("home"),
     [session, setSession] = useState<Session | null>(null),
     [language, setLanguage] = useState<Language>("EN"),
+    [pendingAction, setPendingAction] = useState<(() => Promise<void>) | null>(
+      null,
+    ),
     [pending, setPending] = useState<Page | null>(null),
     [parent, setParent] = useState(false),
     [mobileMenu, setMobileMenu] = useState(false),
@@ -96,7 +104,48 @@ export function AppShell() {
     }
     setPage(target);
   }
-  async function start(category?: string) {
+  async function withParent(action: () => Promise<void>) {
+    try {
+      const check = await fetch("/api/gate", { cache: "no-store" });
+      if (!check.ok) {
+        setPendingAction(() => action);
+        setPending("track");
+        return;
+      }
+      setParent(true);
+      await action();
+    } catch {
+      setError("Could not open parent tools. Please try again.");
+    }
+  }
+  async function confirmMission(missionId: string) {
+    if (starting) return;
+    await withParent(async () => {
+      setStarting(true);
+      setError("");
+      try {
+        const res = await fetch("/api/track", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ missionId, language, offlineDone: true }),
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error);
+        await refresh();
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Could not save mission progress.",
+        );
+      } finally {
+        setStarting(false);
+      }
+    });
+  }
+  async function startMission(missionId: string) {
+    if (starting) return;
+    await withParent(() => start(undefined, missionId));
+  }
+  async function start(category?: string, missionId?: string) {
     if (!data || starting) return;
     setStarting(true);
     setError("");
@@ -110,6 +159,7 @@ export function AppShell() {
           language,
           numberOfCards: data.profile.cardsPerSession,
           category,
+          missionId,
         }),
       });
       const json = await res.json();
@@ -154,6 +204,24 @@ export function AppShell() {
         )}
       </main>
     );
+  if (!data.demo && !data.security.configured)
+    return (
+      <FirstRunSetup
+        legacyPinRequired={data.security.legacyPinRequired}
+        onSaved={() => {
+          setParent(true);
+          setData((current) =>
+            current
+              ? {
+                  ...current,
+                  security: { configured: true, legacyPinRequired: false },
+                }
+              : current,
+          );
+          void refresh();
+        }}
+      />
+    );
   if (session)
     return (
       <LearningSession
@@ -164,7 +232,7 @@ export function AppShell() {
         onExit={() => {
           audioService.stop();
           setSession(null);
-          setPage("home");
+          setPage(session.missionId ? "track" : "home");
           void refresh();
         }}
       />
@@ -357,6 +425,22 @@ export function AppShell() {
                   </div>
                 </div>
               </section>
+              <button
+                className="home-track-banner"
+                onClick={() => void navigate("track")}
+              >
+                <span className="round-symbol">
+                  <Route size={27} />
+                </span>
+                <div>
+                  <h3>Follow our little mission path</h3>
+                  <p>
+                    Four levels. Shared words, longer phrases, and real-world
+                    adventures.
+                  </p>
+                </div>
+                <ArrowRight size={21} />
+              </button>
               <section className="discovery-section">
                 <div className="section-heading">
                   <h2>A little of what they love</h2>
@@ -487,6 +571,15 @@ export function AppShell() {
               </div>
             </section>
           )}
+          {page === "track" && (
+            <MissionTrack
+              data={data}
+              language={language}
+              busy={starting}
+              onStart={(id) => void startMission(id)}
+              onConfirm={(id) => void confirmMission(id)}
+            />
+          )}
           {page === "words" && (
             <VocabularyManager data={data} onRefresh={() => void refresh()} />
           )}
@@ -537,11 +630,19 @@ export function AppShell() {
       </div>
       {pending && (
         <ParentGate
-          onClose={() => setPending(null)}
+          onClose={() => {
+            setPending(null);
+            setPendingAction(null);
+          }}
           onOpen={() => {
             setParent(true);
             setPage(pending);
             setPending(null);
+            if (pendingAction) {
+              const action = pendingAction;
+              setPendingAction(null);
+              void action();
+            }
           }}
         />
       )}

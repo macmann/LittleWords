@@ -1,10 +1,10 @@
 # Native Node service: no Dockerfile. Starter service + paid PostgreSQL + disk.
-# The feature branch is deployable now; change to main after merging the PR.
+# Deploy main after merging this change, or select a feature branch for preview.
 services:
   - type: web
     name: littlewords
     runtime: node
-    branch: codex/littlewords-mvp
+    branch: main
     plan: starter
     numInstances: 1
     buildCommand: npm ci --include=dev && npm run build
@@ -23,8 +23,6 @@ services:
         fromDatabase:
           name: littlewords-db
           property: connectionString
-      - key: PARENT_PIN
-        sync: false
       - key: PARENT_SESSION_SECRET
         generateValue: true
       - key: STORAGE_PROVIDER

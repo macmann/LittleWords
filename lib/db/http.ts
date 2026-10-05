@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 export function apiError(error: unknown) {
+  if (error instanceof SyntaxError)
+    return NextResponse.json(
+      { error: "Please send valid form data." },
+      { status: 400 },
+    );
   if (error instanceof ZodError)
     return NextResponse.json(
       { error: error.issues[0]?.message ?? "Please check the fields." },

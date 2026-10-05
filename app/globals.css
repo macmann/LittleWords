@@ -2327,3 +2327,221 @@ details label {
     scroll-behavior: auto !important;
   }
 }
+
+/* Parent-guided levels and finite mission path. */
+.onboarding-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px;
+}
+.onboarding-card {
+  width: min(100%, 560px);
+}
+.onboarding-card h1 {
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.15;
+  margin: 14px 0;
+}
+.password-form {
+  display: grid;
+  gap: 15px;
+  margin-top: 22px;
+}
+.password-form label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+.password-form .field-help {
+  margin: 0;
+  font-weight: 400;
+}
+.home-track-banner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 18px;
+  padding: 24px;
+  background: var(--mint);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  margin-top: 24px;
+}
+.home-track-banner h3 {
+  margin: 0 0 7px;
+  font-size: 20px;
+}
+.home-track-banner p {
+  margin: 0;
+  line-height: 1.6;
+}
+.home-track-banner > svg {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.track-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 22px;
+  border-radius: 20px;
+  background: var(--mint);
+}
+.track-intro > svg {
+  flex-shrink: 0;
+}
+.track-intro p {
+  margin: 8px 0 0;
+  line-height: 1.7;
+}
+.track-level {
+  margin: 36px 0;
+}
+.track-level-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 17px;
+  margin-bottom: 20px;
+}
+.level-circle {
+  display: grid;
+  place-items: center;
+  height: 48px;
+  width: 48px;
+  flex-shrink: 0;
+  background: var(--green);
+  color: white;
+  border-radius: 50%;
+  font-size: 22px;
+}
+.track-level-heading h2 {
+  margin: 0 0 8px;
+  font-size: 25px;
+}
+.track-level-heading p {
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+.phrase-example {
+  color: var(--green);
+  font-weight: 600;
+}
+.track-missions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.track-mission {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 15px;
+}
+.track-mission.mission-completed {
+  border-color: #b7cfbe;
+}
+.mission-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.mission-heading .round-symbol {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+.mission-heading h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+.mission-heading small {
+  line-height: 1.5;
+  display: block;
+}
+.track-activity {
+  margin: 0;
+  line-height: 1.7;
+  flex: 1;
+}
+.track-mission button {
+  width: 100%;
+  font-size: 14px;
+  padding: 12px;
+  min-height: 48px;
+}
+.track-end-note {
+  max-width: 480px;
+  line-height: 1.7;
+}
+.level-label {
+  font-size: 12px;
+  color: var(--green);
+  margin: 18px 0 10px;
+  font-weight: 600;
+}
+.phrase-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  color: #56665e;
+  font-size: 16px;
+}
+.phrase-steps span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.say-together {
+  padding: 16px;
+  background: var(--mint);
+  border-radius: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.say-together p {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 17px;
+}
+.say-together button {
+  min-height: 48px;
+}
+@media (max-width: 1100px) {
+  .track-missions {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .home-track-banner {
+    padding: 20px 16px;
+    gap: 12px;
+  }
+  .home-track-banner h3 {
+    font-size: 18px;
+  }
+  .home-track-banner p {
+    font-size: 13px;
+  }
+  .mobile-bottom button {
+    min-width: 0;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .mobile-bottom button span {
+    font-size: 9px;
+  }
+  .parent-cue span {
+    font-size: 14px;
+    line-height: 1.6;
+  }
+}
