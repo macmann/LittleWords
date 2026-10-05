@@ -65,7 +65,7 @@ Known concepts start at level 2. Curated alternatives in `lib/content/expansions
 
 Each session contains the configured number of **total cards, including missions**. The API sets `includeMissions` on the generator, reserving a real-world pause after every four word cards. A default ten-card session has eight word cards and two mission cards. Small categories finish earlier, with no duplicated filler. All five authored mission types cycle across sessions. Pause screens offer Done or Skip with no automated verification. Every third word card includes a gentle parent question, a three-second wait, and an expansion suggestion. The completion screen gives one last offline activity and waits for the parent to leave; it never starts another session automatically.
 
-Swipe left/up to continue, right/down to revisit, or use large labeled buttons. Images and Listen buttons replay audio only on a tap; there is no automatic audio. Language switches select one curated language at a time. The primary language and enabled languages are configured in Parent area. No runtime LLM or translation service is used.
+Swipe left to continue or right to revisit, with large labeled buttons also available. Scroll vertically to read longer cards. Touch and pen swipes show drag feedback; a vertical scroll, canceled gesture, short drag, or pinch does not advance a card. Images and Listen buttons replay audio only on a tap; swiping does not trigger accidental playback. Language switches select one curated language at a time. The primary language and enabled languages are configured in Parent area. No runtime LLM or translation service is used.
 
 ## Levels and the mission path
 

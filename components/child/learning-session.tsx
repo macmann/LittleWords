@@ -13,6 +13,7 @@ import {
 import type { Bootstrap, Concept, Language, Session } from "@/types";
 import { audioService } from "@/lib/audio/service";
 import { familiarExpansion, knownConceptSlugs } from "@/lib/content/expansions";
+import { useCardSwipe } from "./use-card-swipe";
 import { levels } from "@/lib/content/levels";
 import { missionTrack } from "@/lib/content/track";
 import { childCopy, missions } from "@/lib/content/missions";
@@ -74,8 +75,7 @@ export function LearningSession({
     [promptReady, setPromptReady] = useState(false),
     [turn, setTurn] = useState(false),
     [ending, setEnding] = useState(false);
-  const touch = useRef<{ x: number; y: number } | null>(null),
-    visited = useRef(new Set<number>()),
+  const visited = useRef(new Set<number>()),
     pauses = useRef(new Set<number>()),
     seenRequests = useRef(new Map<number, Promise<boolean>>());
   const card = session.cards[index],
@@ -201,6 +201,18 @@ export function LearningSession({
     audioService.stop();
     setLanguage(l);
   }
+  const swipe = useCardSwipe({
+    onNext: next,
+    onBack: () => {
+      audioService.stop();
+      setIndex((i) => Math.max(0, i - 1));
+    },
+    canGoBack: index > 0,
+    disabled: ending || complete || mission !== null,
+  });
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [index, mission, complete]);
   if (complete)
     return (
       <div
@@ -309,95 +321,88 @@ export function LearningSession({
       <div className="progress-track">
         <div style={{ width: `${(step / totalSteps) * 100}%` }} />
       </div>
-      <div
-        className="learning-card"
-        onTouchStart={(e) => {
-          touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        }}
-        onTouchEnd={(e) => {
-          if (!touch.current) return;
-          const dx = e.changedTouches[0].clientX - touch.current.x,
-            dy = e.changedTouches[0].clientY - touch.current.y;
-          touch.current = null;
-          if (Math.max(Math.abs(dx), Math.abs(dy)) < 65) return;
-          const forward = Math.abs(dx) > Math.abs(dy) ? dx < 0 : dy < 0;
-          if (forward) next();
-          else if (index > 0) setIndex((i) => i - 1);
-        }}
-      >
-        <button
-          className="card-image"
-          onClick={() => void play(true)}
-          aria-label={`Listen to ${t.word}`}
+      <p className="swipe-hint">{copy.swipe}</p>
+      <div className="swipe-viewport">
+        <div
+          key={`${index}-${language}`}
+          className={`learning-card ${swipe.dragging ? "card-dragging" : ""}`}
+          style={{ transform: `translateX(${swipe.offset}px)` }}
+          {...swipe.handlers}
         >
-          <Photo concept={concept} />
-          <span className="tap-hint">
-            <Volume2 size={16} /> Tap to hear
-          </span>
-        </button>
-        <h1>{t.word}</h1>
-        <button className="listen-button" onClick={() => void play()}>
-          <Volume2 size={24} />
-          {copy.listen}
-        </button>
-        <p className="level-label">
-          Level {card.levelShown} · {levels[card.levelShown - 1].title}
-        </p>
-        {card.levelShown > 2 && (
-          <div className="phrase-steps" aria-label="Build the phrase">
-            {[t.phraseLevel2, t.phraseLevel3]
-              .slice(0, card.levelShown - 2)
-              .map((step, i) => (
-                <span key={i}>
-                  {step}
-                  <ArrowRight size={14} />
-                </span>
-              ))}
-          </div>
-        )}
-        <p className="expanded-phrase">{phrase}</p>
-        <div className="say-together">
-          <Heart size={18} />
-          <p>
-            {turn ? copy.yourTurn : levels[card.levelShown - 1].cue[language]}
-          </p>
           <button
-            className="secondary"
-            onClick={() => {
-              audioService.stop();
-              setTurn(!turn);
-              if (turn) void play();
-            }}
+            className="card-image"
+            onClick={() => void play(true)}
+            aria-label={`Listen to ${t.word}`}
           >
-            {turn ? copy.together : copy.giveTurn}
+            <Photo concept={concept} />
+            <span className="tap-hint">
+              <Volume2 size={16} /> Tap to hear
+            </span>
           </button>
-        </div>
-        {guide ? (
-          <div className="parent-cue">
-            <p>
-              <Heart size={16} /> A moment together
-            </p>
-            <h3>{t.promptText}</h3>
-            {promptReady ? (
-              <>
-                <span>If they point or say a word, respond: “{phrase}”</span>
-                <span>
-                  No answer? Gently model “{phrase}”. A look or a point is
-                  welcome.
-                </span>
-              </>
-            ) : (
-              <span>Pause and give them time to respond.</span>
-            )}
-          </div>
-        ) : (
-          <p className="together-note">{copy.look}</p>
-        )}
-        {audioMessage && (
-          <p className="audio-message" role="status">
-            {audioMessage}
+          <h1>{t.word}</h1>
+          <button className="listen-button" onClick={() => void play()}>
+            <Volume2 size={24} />
+            {copy.listen}
+          </button>
+          <p className="level-label">
+            Level {card.levelShown} · {levels[card.levelShown - 1].title}
           </p>
-        )}
+          {card.levelShown > 2 && (
+            <div className="phrase-steps" aria-label="Build the phrase">
+              {[t.phraseLevel2, t.phraseLevel3]
+                .slice(0, card.levelShown - 2)
+                .map((step, i) => (
+                  <span key={i}>
+                    {step}
+                    <ArrowRight size={14} />
+                  </span>
+                ))}
+            </div>
+          )}
+          <p className="expanded-phrase">{phrase}</p>
+          <div className="say-together">
+            <Heart size={18} />
+            <p>
+              {turn ? copy.yourTurn : levels[card.levelShown - 1].cue[language]}
+            </p>
+            <button
+              className="secondary"
+              onClick={() => {
+                audioService.stop();
+                setTurn(!turn);
+                if (turn) void play();
+              }}
+            >
+              {turn ? copy.together : copy.giveTurn}
+            </button>
+          </div>
+          {guide ? (
+            <div className="parent-cue">
+              <p>
+                <Heart size={16} /> A moment together
+              </p>
+              <h3>{t.promptText}</h3>
+              {promptReady ? (
+                <>
+                  <span>If they point or say a word, respond: “{phrase}”</span>
+                  <span>
+                    No answer? Gently model “{phrase}”. A look or a point is
+                    welcome.
+                  </span>
+                </>
+              ) : (
+                <span>Pause and give them time to respond.</span>
+              )}
+            </div>
+          ) : (
+            <p className="together-note">{copy.look}</p>
+          )}
+          {audioMessage && (
+            <p className="audio-message" role="status">
+              {audioMessage}
+            </p>
+          )}
+        </div>
       </div>
       <footer className="session-footer">
         <button
@@ -408,7 +413,7 @@ export function LearningSession({
           <ArrowLeft size={20} />
           {copy.back}
         </button>
-        <span>Swipe or use the arrows</span>
+        <span>{copy.swipe}</span>
         <button className="primary" disabled={ending} onClick={next}>
           {ending
             ? "Saving…"
