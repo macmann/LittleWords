@@ -1350,7 +1350,7 @@ details label {
   border-radius: 26px;
   padding: 22px 35px;
   text-align: center;
-  touch-action: pan-y;
+  touch-action: pan-y pinch-zoom;
   animation: card-in 0.3s ease;
 }
 .card-image {
@@ -2315,7 +2315,7 @@ details label {
     padding-bottom: max(35px, env(safe-area-inset-bottom));
   }
   .learning-card {
-    touch-action: pan-y;
+    touch-action: pan-y pinch-zoom;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2543,5 +2543,65 @@ details label {
   .parent-cue span {
     font-size: 14px;
     line-height: 1.6;
+  }
+}
+
+.swipe-viewport {
+  overflow: hidden;
+  border-radius: 26px;
+}
+.swipe-hint {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526b5b;
+  margin: -8px 0 12px;
+}
+.learning-card {
+  transition: transform 180ms ease-out;
+  overflow-wrap: anywhere;
+}
+.learning-card.card-dragging {
+  animation: none;
+  transition: none;
+  user-select: none;
+}
+.card-image {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.session-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  background: var(--paper);
+  padding: 12px 0 max(12px, env(safe-area-inset-bottom));
+}
+.learning {
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-left: max(17px, env(safe-area-inset-left));
+  padding-right: max(17px, env(safe-area-inset-right));
+}
+@media (max-width: 700px) {
+  .swipe-viewport {
+    border-radius: 20px;
+  }
+  .learning-header {
+    flex-wrap: wrap;
+  }
+  .swipe-hint {
+    font-size: 11px;
+  }
+}
+@media (max-height: 740px) and (max-width: 700px) {
+  .card-image {
+    height: clamp(180px, 30dvh, 230px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .learning-card {
+    transition: none;
+    animation: none;
   }
 }
