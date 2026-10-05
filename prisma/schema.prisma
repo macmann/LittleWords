@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Language {
+  EN
+  MY
+  DE
+}
+enum VocabularyStatus {
+  KNOWN
+  LEARNING
+  NEW
+}
+enum ConceptType {
+  OBJECT
+  ACTION
+  COLOR
+  DESCRIPTION
+  PERSON
+}
+model User {
+  id String @id @default(cuid())
+  email String? @unique
+  createdAt DateTime @default(now())
+  children ChildProfile[]
+}
+model ChildProfile {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name String
+  birthDate DateTime?
+  primaryLanguage Language @default(EN)
+  enabledLanguages Language[] @default([EN, MY, DE])
+  cardsPerSession Int @default(10)
+  createdAt DateTime @default(now())
+  vocabulary ChildVocabulary[]
+  sessions LearningSession[]
+  customConcepts Concept[]
+}
+model Category {
+  id String @id @default(cuid())
+  slug String @unique
+  name String
+  icon String
+  sortOrder Int @default(0)
+  concepts Concept[]
+  sessions LearningSession[]
+}
+model Concept {
+  id String @id @default(cuid())
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id])
+  slug String @unique
+  imageUrl String
+  type ConceptType @default(OBJECT)
+  difficulty Int @default(1)
+  active Boolean @default(true)
+  childId String?
+  child ChildProfile? @relation(fields: [childId], references: [id], onDelete: Cascade)
+  translations ConceptTranslation[]
+  vocabulary ChildVocabulary[]
+  cards SessionCard[]
+}
+model ConceptTranslation {
+  id String @id @default(cuid())
+  conceptId String
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  language Language
+  word String
+  phraseLevel2 String
+  phraseLevel3 String
+  sentence String
+  promptText String
+  audioWordUrl String?
+  audioPhraseUrl String?
+  audioSentenceUrl String?
+  needsReview Boolean @default(false)
+  @@unique([conceptId, language])
+}
+model ChildVocabulary {
+  id String @id @default(cuid())
+  childId String
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  status VocabularyStatus @default(NEW)
+  lastSeen DateTime?
+  seenCount Int @default(0)
+  favorite Boolean @default(false)
+  parentConfirmed Boolean @default(false)
+  comfortableLevel Int @default(1)
+  @@unique([childId, conceptId])
+}
+model LearningSession {
+  id String @id @default(cuid())
+  childId String
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  language Language
+  categoryId String?
+  category Category? @relation(fields: [categoryId], references: [id])
+  startedAt DateTime @default(now())
+  completedAt DateTime?
+  cards SessionCard[]
+}
+model SessionCard {
+  id String @id @default(cuid())
+  sessionId String
+  session LearningSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept Concept @relation(fields: [conceptId], references: [id])
+  levelShown Int
+  sequence Int
+  seenAt DateTime?
+  @@unique([sessionId, sequence])
+}

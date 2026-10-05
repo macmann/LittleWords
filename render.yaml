@@ -1,0 +1,42 @@
+# Native Node service: no Dockerfile. Starter service + paid PostgreSQL + disk.
+# The feature branch is deployable now; change to main after merging the PR.
+services:
+  - type: web
+    name: littlewords
+    runtime: node
+    branch: codex/littlewords-mvp
+    plan: starter
+    numInstances: 1
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node scripts/deploy.mjs
+    healthCheckPath: /api/health
+    disk:
+      name: littlewords-photos
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: littlewords-db
+          property: connectionString
+      - key: PARENT_PIN
+        sync: false
+      - key: PARENT_SESSION_SECRET
+        generateValue: true
+      - key: STORAGE_PROVIDER
+        value: local
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: TTS_PROVIDER
+        value: none
+
+databases:
+  - name: littlewords-db
+    databaseName: littlewords
+    user: littlewords
+    plan: basic-256mb
+    ipAllowList: []
