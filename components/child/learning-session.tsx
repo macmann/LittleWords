@@ -13,6 +13,8 @@ import {
 import type { Bootstrap, Concept, Language, Session } from "@/types";
 import { audioService } from "@/lib/audio/service";
 import { familiarExpansion, knownConceptSlugs } from "@/lib/content/expansions";
+import { levels } from "@/lib/content/levels";
+import { missionTrack } from "@/lib/content/track";
 import { childCopy, missions } from "@/lib/content/missions";
 export function LanguageControls({
   language,
@@ -63,17 +65,19 @@ export function LearningSession({
   browserVoice: boolean;
   onRefresh: () => void;
 }) {
-  const [index, setIndex] = useState(0),
+  const [index, setIndex] = useState(session.resumeSequence ?? 0),
     [language, setLanguage] = useState<Language>(session.language),
     [mission, setMission] = useState<number | null>(null),
     [complete, setComplete] = useState(false),
     [audioMessage, setAudioMessage] = useState(""),
     [saveError, setSaveError] = useState(""),
     [promptReady, setPromptReady] = useState(false),
+    [turn, setTurn] = useState(false),
     [ending, setEnding] = useState(false);
   const touch = useRef<{ x: number; y: number } | null>(null),
     visited = useRef(new Set<number>()),
-    pauses = useRef(new Set<number>());
+    pauses = useRef(new Set<number>()),
+    seenRequests = useRef(new Map<number, Promise<boolean>>());
   const card = session.cards[index],
     concept = data.concepts.find((c) => c.id === card?.conceptId),
     t = concept
@@ -84,7 +88,8 @@ export function LearningSession({
         )
       : undefined,
     copy = childCopy[language];
-  const guide = index % 3 === 2;
+  const trackMission = missionTrack.find((m) => m.id === session.missionId);
+  const guide = !!trackMission || index % 3 === 2;
   // Cycle the authored mission types across sessions, without generating text.
   const missionOffset =
     [...session.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) %
@@ -96,6 +101,7 @@ export function LearningSession({
     audioService.stop();
     setAudioMessage("");
     setPromptReady(false);
+    setTurn(false);
     const timer = setTimeout(() => setPromptReady(true), 3000);
     return () => {
       clearTimeout(timer);
@@ -105,25 +111,23 @@ export function LearningSession({
   useEffect(() => {
     if (!card || visited.current.has(index)) return;
     visited.current.add(index);
-    fetch("/api/sessions", {
+    const request = fetch("/api/sessions", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionId: session.id, sequence: index }),
+      body: JSON.stringify({ sessionId: session.id, sequence: card.sequence }),
     })
-      .then(async (res) => {
-        if (!res.ok) {
+      .then((res) => res.ok)
+      .catch(() => false)
+      .then((ok) => {
+        if (!ok) {
           visited.current.delete(index);
           setSaveError(
             "Progress could not be saved. You can still enjoy the cards.",
           );
         }
-      })
-      .catch(() => {
-        visited.current.delete(index);
-        setSaveError(
-          "Progress could not be saved. You can still enjoy the cards.",
-        );
+        return ok;
       });
+    seenRequests.current.set(index, request);
   }, [card, index, session.id]);
   async function play(word = false) {
     if (!t) return;
@@ -142,6 +146,21 @@ export function LearningSession({
   async function finish() {
     setEnding(true);
     try {
+      await Promise.all(seenRequests.current.values());
+      // Retry seen-card writes before completion, without counting exposures twice.
+      for (const [i, request] of seenRequests.current) {
+        if (!(await request)) {
+          const retry = await fetch("/api/sessions", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: session.id,
+              sequence: session.cards[i].sequence,
+            }),
+          });
+          if (!retry.ok) throw new Error("Progress could not be saved.");
+        }
+      }
       const res = await fetch("/api/sessions", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -196,9 +215,19 @@ export function LearningSession({
         <p>{copy.finished}</p>
         <div className="mission-box">
           <Hand size={32} />
-          <h2>{missions[0].text[language]}</h2>
+          <h2>
+            {trackMission
+              ? trackMission.activity[language]
+              : missions[0].text[language]}
+          </h2>
           <p>Put the screen away and explore together.</p>
         </div>
+        {trackMission && (
+          <p className="track-end-note">
+            After exploring together, a grown-up can confirm this mission on the
+            path. The next mission can wait.
+          </p>
+        )}
         {saveError && (
           <p role="status" className="form-error">
             {saveError}
@@ -209,7 +238,7 @@ export function LearningSession({
           {copy.done}
         </button>
         <button className="text-button" onClick={onExit}>
-          {copy.home}
+          {trackMission ? copy.path : copy.home}
         </button>
       </div>
     );
@@ -225,7 +254,11 @@ export function LearningSession({
         <p className="eyebrow">A LITTLE REAL-WORLD MOMENT</p>
         <h1>{copy.mission}</h1>
         <h2>
-          {missions[(mission + missionOffset) % missions.length].text[language]}
+          {trackMission
+            ? trackMission.activity[language]
+            : missions[(mission + missionOffset) % missions.length].text[
+                language
+              ]}
         </h2>
         <p>Take your time. Explore together.</p>
         <button className="primary" onClick={dismissMission}>
@@ -257,7 +290,7 @@ export function LearningSession({
       <header className="learning-header">
         <button
           className="icon-button"
-          aria-label="End session and go home"
+          aria-label="End session"
           onClick={onExit}
         >
           <X />
@@ -267,7 +300,9 @@ export function LearningSession({
         </span>
         <LanguageControls
           language={language}
-          enabled={data.profile.enabledLanguages}
+          enabled={
+            trackMission ? [session.language] : data.profile.enabledLanguages
+          }
           onChange={changeLanguage}
         />
       </header>
@@ -305,7 +340,38 @@ export function LearningSession({
           <Volume2 size={24} />
           {copy.listen}
         </button>
+        <p className="level-label">
+          Level {card.levelShown} · {levels[card.levelShown - 1].title}
+        </p>
+        {card.levelShown > 2 && (
+          <div className="phrase-steps" aria-label="Build the phrase">
+            {[t.phraseLevel2, t.phraseLevel3]
+              .slice(0, card.levelShown - 2)
+              .map((step, i) => (
+                <span key={i}>
+                  {step}
+                  <ArrowRight size={14} />
+                </span>
+              ))}
+          </div>
+        )}
         <p className="expanded-phrase">{phrase}</p>
+        <div className="say-together">
+          <Heart size={18} />
+          <p>
+            {turn ? copy.yourTurn : levels[card.levelShown - 1].cue[language]}
+          </p>
+          <button
+            className="secondary"
+            onClick={() => {
+              audioService.stop();
+              setTurn(!turn);
+              if (turn) void play();
+            }}
+          >
+            {turn ? copy.together : copy.giveTurn}
+          </button>
+        </div>
         {guide ? (
           <div className="parent-cue">
             <p>
@@ -314,11 +380,10 @@ export function LearningSession({
             <h3>{t.promptText}</h3>
             {promptReady ? (
               <>
+                <span>If they point or say a word, respond: “{phrase}”</span>
                 <span>
-                  If they say “{t.word}”, respond: “{t.phraseLevel2}!”
-                </span>
-                <span>
-                  No answer? Gently say: “{t.word}. {t.phraseLevel2}.”
+                  No answer? Gently model “{phrase}”. A look or a point is
+                  welcome.
                 </span>
               </>
             ) : (

@@ -5,6 +5,7 @@ import { apiError, requireDatabase } from "@/lib/db/http";
 import { protectParent } from "@/lib/parent-auth";
 const schema = z
   .object({
+    practiceLevel: z.number().int().min(0).max(4),
     name: z.string().trim().min(1).max(50),
     primaryLanguage: z.enum(["EN", "MY", "DE"]),
     enabledLanguages: z

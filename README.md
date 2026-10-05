@@ -9,7 +9,7 @@ Use Node.js 22 or newer and PostgreSQL 14 or newer. No Docker or paid API is req
 ```sh
 npm install
 cp .env.example .env
-# Set DATABASE_URL, PARENT_PIN, and PARENT_SESSION_SECRET in .env.
+# Set DATABASE_URL and PARENT_SESSION_SECRET in .env.
 npx prisma generate
 npm run db:migrate
 npm run db:seed
@@ -24,18 +24,19 @@ The current cloud workspace has an initialized local PostgreSQL instance. Its ig
 
 ## Commands
 
-| Command                  | Purpose                                                                     |
-| ------------------------ | --------------------------------------------------------------------------- |
-| `npm install`            | Install dependencies using the committed lockfile                           |
-| `npm run dev`            | Start Next.js development server                                            |
-| `npx prisma generate`    | Generate the typed database client                                          |
-| `npm run db:migrate`     | Apply the committed PostgreSQL migration                                    |
-| `npm run db:seed`        | Create demo content/profile without overwriting parent edits                |
-| `npm test`               | Run session-generation and deployment tests                                 |
-| `npm run build`          | Generate Prisma client, type-check, and build production app                |
-| `npm run deploy:prepare` | Validate hosting settings, apply migrations, and seed without starting HTTP |
-| `npm run deploy:start`   | Prepare the database/uploads and start the hosted service on `$PORT`        |
-| `npm start`              | Run the production build                                                    |
+| Command                    | Purpose                                                                     |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `npm install`              | Install dependencies using the committed lockfile                           |
+| `npm run dev`              | Start Next.js development server                                            |
+| `npx prisma generate`      | Generate the typed database client                                          |
+| `npm run test:integration` | Exercise production API flows using a disposable PostgreSQL schema          |
+| `npm run db:migrate`       | Apply the committed PostgreSQL migration                                    |
+| `npm run db:seed`          | Create demo content/profile without overwriting parent edits                |
+| `npm test`                 | Run session-generation and deployment tests                                 |
+| `npm run build`            | Generate Prisma client, type-check, and build production app                |
+| `npm run deploy:prepare`   | Validate hosting settings, apply migrations, and seed without starting HTTP |
+| `npm run deploy:start`     | Prepare the database/uploads and start the hosted service on `$PORT`        |
+| `npm start`                | Run the production build                                                    |
 
 For a new schema change in a separate development task, use `npx prisma migrate dev --name descriptive_name` and commit the generated migration. Deployments use `migrate deploy`, never `db push` or destructive resets. Seeding can be repeated: existing phrases, statuses, settings, custom cards, and exposure counts are retained.
 
@@ -48,12 +49,11 @@ For a new schema change in a separate development task, use `npx prisma migrate 
 | `APP_ORIGIN`            | Optional canonical public HTTPS origin for parent requests behind a proxy                           |
 | `STORAGE_PROVIDER`      | `local` (default); another provider requires a PhotoStorage adapter                                 |
 | `TTS_PROVIDER`          | `none`; reserved for a future server-side provider, not used to call an API                         |
-| `PARENT_PIN`            | A 4–8 digit parent PIN; development defaults to `2468`; production requires an explicit value       |
 | `PARENT_SESSION_SECRET` | Random secret of at least 32 characters for signed parent cookies; required in production           |
 
-Generate the session secret with a secure random tool and save it directly in your local environment or secret manager. Never commit `.env`. The sample PIN is for household development; change it before sharing. Parent sessions expire after 30 minutes, use HttpOnly/SameSite cookies, and are locked when learning begins. Parent writes check the gate on the server and enforce same-origin requests. The gate uses a basic single-process attempt limit.
+Generate the session secret with a secure random tool and save it directly in your local environment or secret manager. Never commit `.env`. Choose your parent password in the app on first launch. It is stored in PostgreSQL as a salted scrypt hash, never plaintext. You can change it in Parent area; changing it locks other parent sessions. There is no default password. Parent sessions expire after 30 minutes, use HttpOnly/SameSite cookies, and are locked when learning begins. Parent writes check the gate on the server and enforce same-origin requests. The gate uses a basic single-process attempt limit.
 
-This MVP uses one household and one seeded child (`demo-child`). The parent PIN is a child-mode gate, not a multi-user authentication system. Do not expose private photos/profile APIs on the public Internet without adding full household authentication, tenant authorization, production rate limiting, upload limits at the reverse proxy, and privacy/deletion controls. The data model supports additional users/children; the UI intentionally focuses on one child.
+This MVP uses one household and one seeded child (`demo-child`). The parent password is a child-mode gate, not a multi-user authentication system. Do not expose private photos/profile APIs on the public Internet without adding full household authentication, tenant authorization, production rate limiting, upload limits at the reverse proxy, and privacy/deletion controls. The data model supports additional users/children; the UI intentionally focuses on one child.
 
 ## Learning and personalization
 
@@ -66,6 +66,22 @@ Known concepts start at level 2. Curated alternatives in `lib/content/expansions
 Each session contains the configured number of **total cards, including missions**. The API sets `includeMissions` on the generator, reserving a real-world pause after every four word cards. A default ten-card session has eight word cards and two mission cards. Small categories finish earlier, with no duplicated filler. All five authored mission types cycle across sessions. Pause screens offer Done or Skip with no automated verification. Every third word card includes a gentle parent question, a three-second wait, and an expansion suggestion. The completion screen gives one last offline activity and waits for the parent to leave; it never starts another session automatically.
 
 Swipe left/up to continue, right/down to revisit, or use large labeled buttons. Images and Listen buttons replay audio only on a tap; there is no automatic audio. Language switches select one curated language at a time. The primary language and enabled languages are configured in Parent area. No runtime LLM or translation service is used.
+
+## Levels and the mission path
+
+In **Parent area → Phrase level**, choose automatic familiar-word expansion (the default) or one of four practice levels: **1: words**, **2: short phrases**, **3: richer phrases**, **4: simple sentences**. The selected level is stored on the child profile and used for regular sessions; it is an explicit parent choice, never an automatic reward for swiping. Cards show the phrase building up, then offer a turn for a look, point, or word and a chance to say it together. Content remains authored in each language; levels describe complexity rather than an exact word count across languages.
+
+**Missions** opens a finite 12-adventure path, with three missions at each level. Each adventure has up to four unique word cards and a real-world pause, with repeated themes to grow familiar language. The mission defines its practice level independently of the regular-session setting. Mission prompts live in `lib/content/track.ts`; level guidance lives in `lib/content/levels.ts`. New Burmese prompts are reviewable alongside the existing Burmese content.
+
+Mission progress is stored in PostgreSQL for each child and language. The first mission is available immediately; each later mission needs the earlier missions confirmed. Starting practice requires the parent gate; learning locks it again. After completing all mission cards, leave the screen and explore the activity. Back on the mission path, a parent presses **We explored it together** and opens the gate to confirm. Only that confirmation unlocks the next mission. Skipping a pause, completing a session, or exposure counts alone cannot advance the track. Replay completed missions freely, resume an unfinished practice at its next card, and stop after any session. No pronunciation grading, points, streaks, or automatic next session are added.
+
+## First-run password setup and upgrading
+
+After configuring the database, apply migrations and seed, then open the app privately to set and confirm an 8–128 character parent password. The singleton credential prevents two simultaneous setup requests from overwriting each other. The first person who can access an unclaimed household installation can perform setup, so complete it before making the installation publicly accessible. `PARENT_SESSION_SECRET` is still a server signing secret, not the parent's password; Render generates it automatically.
+
+Existing installations that have `PARENT_PIN` set require that old PIN once during first-run password setup. After setup, only the new password works; remove `PARENT_PIN` from hosting variables. The credential and mission progress survive redeploys and repeated seeds. Existing vocabulary and phrase comfort are preserved. Old PIN-era parent cookies are invalidated on upgrade.
+
+There is no email password recovery. For an owner-managed recovery, use a trusted PostgreSQL administration connection to delete only the `ParentCredential` row with id `household`, lock down access to the app, remove or retain a known legacy PIN as appropriate, and complete first-run setup again. This invalidates parent access until reconfigured and must only be done by the household's administrator; it does not reset vocabulary or missions.
 
 ## Content and translations
 
@@ -122,7 +138,7 @@ API validation uses Zod. Known Prisma errors produce usable conflict/not-found m
 
 Both platforms are supported using native Node build/start commands. [Deployment instructions](docs/deployment.md) cover Render's `render.yaml` Blueprint and Coolify's `nixpacks.toml`, PostgreSQL, durable photo storage, secrets, health checks, and redeployment. No Dockerfile is required in this repository; Coolify manages its own containers through Nixpacks.
 
-Hosted services use `npm run deploy:start`: validate runtime settings, verify a writable upload mount, apply Prisma migrations, idempotently seed content, then listen on `0.0.0.0:$PORT`. Required variables are `DATABASE_URL`, `PARENT_PIN`, `PARENT_SESSION_SECRET`, and an absolute `UPLOAD_DIR` on persistent storage. The Render Blueprint provisions paid PostgreSQL and a disk-backed single web-service instance. Nothing is provisioned just by committing these files.
+Hosted services use `npm run deploy:start`: validate runtime settings, verify a writable upload mount, apply Prisma migrations, idempotently seed content, then listen on `0.0.0.0:$PORT`. Required variables are `DATABASE_URL`, `PARENT_SESSION_SECRET`, and an absolute `UPLOAD_DIR` on persistent storage. The Render Blueprint provisions paid PostgreSQL and a disk-backed single web-service instance. Nothing is provisioned just by committing these files.
 
 `/api/health` returns 200 only when the database/profile and upload directory are available. Parent cookies are always Secure in production; optional `APP_ORIGIN` handles proxies with rewritten Host headers without trusting arbitrary forwarded headers.
 
@@ -135,6 +151,6 @@ npm run build
 npm start
 ```
 
-Eleven domain tests cover selection ratios, language availability, sparse categories, disabled concepts, finite length, duplicates, deterministic output, and parent-controlled progression. Three deployment tests cover runtime configuration, proxy origins, and external photo storage. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. See the final task report for actual results; running these commands is necessary on a new deployment.
+Tests cover selection ratios, language availability, finite length, deterministic output, parent-controlled levels, mission unlocking per language, salted password hashing, runtime configuration, proxy origins, and external photo storage. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. Run `npm run build` then `npm run test:integration` with a PostgreSQL role that can create schemas to exercise the full production API flow: atomic first-run setup, PIN upgrade, password changes, server-enforced levels and mission progression, idempotent exposure writes, resume, and restart/seed persistence. The integration check creates a random isolated schema and removes only that schema afterwards; it does not reset your household data. It starts a temporary production server on port 3120 (`INTEGRATION_PORT` can override it).
 
 Current boundaries: single household/child, illustrative seed images, Burmese editorial review, no bundled recordings, basic offline shell only, local upload storage, and no parent-account authentication. Suggested next steps are native-language review, clear object photos and recorded audio, more curated descriptor combinations, an S3 adapter, household authentication/data deletion, and deliberately finite offline sessions. Keep parent-child interaction central as the app grows.

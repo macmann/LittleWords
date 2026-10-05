@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Check, ShieldCheck, Volume2, Library, ArrowRight } from "lucide-react";
+import { levels } from "@/lib/content/levels";
+import { ParentPasswordForm } from "./password-form";
 import type { Bootstrap, Language, Profile } from "@/types";
 export function Settings({
   data,
@@ -109,6 +111,29 @@ export function Settings({
               </label>
             ))}
           </fieldset>
+          <label>
+            Phrase level
+            <select
+              value={profile.practiceLevel}
+              onChange={(e) =>
+                setProfile({
+                  ...profile,
+                  practiceLevel: Number(e.target.value),
+                })
+              }
+            >
+              <option value={0}>At their pace — familiar word expansion</option>
+              {levels.map((l) => (
+                <option key={l.level} value={l.level}>
+                  Level {l.level}: {l.title}
+                </option>
+              ))}
+            </select>
+            <span className="field-help">
+              You choose when to try longer phrases. Finishing cards never
+              raises the level automatically.
+            </span>
+          </label>
           <fieldset>
             <legend>Cards per session</legend>
             <div className="length-options">
@@ -145,6 +170,11 @@ export function Settings({
           </button>
         </form>
         <div className="settings-aside">
+          <article className="settings-card">
+            <ShieldCheck size={26} />
+            <h2>Parent password</h2>
+            <ParentPasswordForm onSaved={onRefresh} />
+          </article>
           <article className="settings-card">
             <Volume2 size={26} />
             <h2>A familiar voice</h2>

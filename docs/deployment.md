@@ -8,12 +8,12 @@ Both platform configurations use Node 22, `npm ci --include=dev && npm run build
 
 ### Blueprint (recommended)
 
-1. Push the repository, then create a **New Blueprint** in Render using `render.yaml`. The checked-in blueprint deploys `codex/littlewords-mvp`, where the app currently lives. Select that branch for Blueprint discovery; switch `branch` to `main` after merging the app into main. Forks should select their own repository/branch.
+1. Push the repository, then create a **New Blueprint** in Render using `render.yaml`. The checked-in blueprint deploys `main`; merge the feature branch first or select a feature branch for a preview. Forks should select their own repository/branch.
 2. Review the resources and plans before creating them. The blueprint creates a **Starter Node web service**, **Basic 256 MB PostgreSQL database**, and **1 GB persistent disk**. These are paid resources. Free web services cannot provide durable local photo storage. Both resources use Render's default region; keep database and web service in the same region if changing it.
-3. Enter a private 4–8 digit `PARENT_PIN`. Render generates `PARENT_SESSION_SECRET` and injects the database's internal connection string automatically. No database password is committed to the repository. External database access is disabled by the blueprint's empty `ipAllowList`.
+3. Render generates `PARENT_SESSION_SECRET` and injects the database's internal connection string automatically. No database password is committed to the repository. External database access is disabled by the blueprint's empty `ipAllowList`.
 4. Deploy. Startup migrates and seeds the database. The disk mounts at `/var/data`; uploads use `/var/data/uploads`. Render supplies `PORT` automatically.
 5. Set a custom domain and HTTPS if desired. When a proxy rewrites the Host header, set `APP_ORIGIN` to the canonical HTTPS site origin (e.g. `https://words.example.com`). Do not include a path. When set, parent writes are accepted only from that exact browser origin. Choose one canonical domain; alternate domains should redirect to it.
-6. Confirm that `/api/health` returns HTTP 200 with `{"status":"ok"}`. The first page should show database-backed content rather than the read-only demo. Open the parent gate, save a photo card, redeploy, and verify the photo still loads.
+6. Confirm that `/api/health` returns HTTP 200 with `{"status":"ok"}`. The first page should show database-backed content rather than the read-only demo. Complete first-run password setup privately, open the parent gate, save a photo card, redeploy, and verify the photo still loads.
 
 The single disk-backed instance is intentional. Render disk-backed services have deployment downtime and cannot share this local disk across multiple instances. Use coordinated database releases and object storage before horizontal scaling. Back up both PostgreSQL and the upload disk.
 
@@ -21,15 +21,15 @@ The single disk-backed instance is intentional. Render disk-backed services have
 
 Create a PostgreSQL database and a **Web Service → Native Node**, using the repository root:
 
-| Setting           | Value                                                         |
-| ----------------- | ------------------------------------------------------------- |
-| Branch            | Branch containing the app (currently `codex/littlewords-mvp`) |
-| Build command     | `npm ci --include=dev && npm run build`                       |
-| Start command     | `node scripts/deploy.mjs`                                     |
-| Health check path | `/api/health`                                                 |
-| Node version      | `22` (`NODE_VERSION=22`, also pinned by `.nvmrc`)             |
-| Disk              | Mount `/var/data`; choose suitable capacity                   |
-| Instances         | 1                                                             |
+| Setting           | Value                                             |
+| ----------------- | ------------------------------------------------- |
+| Branch            | Branch containing the app (`main` after merging)  |
+| Build command     | `npm ci --include=dev && npm run build`           |
+| Start command     | `node scripts/deploy.mjs`                         |
+| Health check path | `/api/health`                                     |
+| Node version      | `22` (`NODE_VERSION=22`, also pinned by `.nvmrc`) |
+| Disk              | Mount `/var/data`; choose suitable capacity       |
+| Instances         | 1                                                 |
 
 Use the runtime variables listed below. Set `DATABASE_URL` to Render's **internal** database URL. Do not set a fixed Render port or use a static-site publish directory. Keep preparation in the start command: a persistent disk is available in the running service, not the build environment or a separate pre-deploy job.
 
@@ -44,7 +44,7 @@ Use the runtime variables listed below. Set `DATABASE_URL` to Render's **interna
    - Node version: `NIXPACKS_NODE_VERSION=22`
 4. Set **Ports Exposes** to `3000` and runtime `PORT=3000`. Bind the public HTTPS domain to this application port. The start command listens on all interfaces.
 5. Add **Persistent Storage** as a volume or bind mount with destination `/app-data`, then set `UPLOAD_DIR=/app-data/uploads`. Ensure the runtime application's user can read and write the mount. The filesystem of a build/deployment container is otherwise ephemeral. Never mount over the source root, `public`, `node_modules`, or `.next`.
-6. Set `DATABASE_URL`, `PARENT_PIN`, and `PARENT_SESSION_SECRET` as runtime variables. Keep them out of Git. Generate a random secret of at least 32 characters and retain it across redeploys. Enable build-time variables only when necessary; the build does not need live database access or parent credentials. Keep Node version available to the build pack. Set `APP_ORIGIN` to your public HTTPS origin if the proxy rewrites Host; using it explicitly also restricts parent writes to the selected domain.
+6. Set `DATABASE_URL` and `PARENT_SESSION_SECRET` as runtime variables. Keep them out of Git. Generate a random secret of at least 32 characters and retain it across redeploys. Enable build-time variables only when necessary; the build does not need live database access or parent credentials. Keep Node version available to the build pack. Set `APP_ORIGIN` to your public HTTPS origin if the proxy rewrites Host; using it explicitly also restricts parent writes to the selected domain.
 7. Enable HTTP health checks: GET `/api/health`, port `3000`, expected status `200`. Give a fresh deployment at least **120 seconds** of startup grace for installation-independent migration/seed work (increase if your database is slow). These settings are per-application controls in Coolify; no health-check binary is required in the image.
 8. Deploy and check logs. First startup inserts 73 concepts and the demo profile. Verify parent edits, a complete finite session, and a photo upload. Redeploy and verify the photo and vocabulary remain.
 
@@ -55,7 +55,6 @@ Nixpacks automatically builds Coolify's container; no local Docker installation 
 | Variable                | Required               | Value                                                                                                                                     |
 | ----------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`          | Yes                    | Internal PostgreSQL connection string. Use provider-required TLS options for remote connections; do not disable certificate verification. |
-| `PARENT_PIN`            | Yes                    | Private 4–8 digit PIN; change the development example.                                                                                    |
 | `PARENT_SESSION_SECRET` | Yes                    | Stable random string of at least 32 characters.                                                                                           |
 | `UPLOAD_DIR`            | Yes for `deploy:start` | Absolute directory on a mounted persistent disk/volume.                                                                                   |
 | `PORT`                  | Platform-dependent     | Render supplies it; use `3000` in Coolify. Defaults to `3000` outside Render.                                                             |
@@ -78,4 +77,10 @@ For an existing installation switching to `UPLOAD_DIR`, copy the old `public/upl
 
 ## Privacy boundary
 
-This is still a **single-household MVP**, not a multi-user SaaS. The parent PIN protects editing from child mode; it does not authenticate every read of the site, profile, or photo API. Put a household deployment behind an access-controlled gateway/proxy before adding private family photos, or add full household authentication first. HTTPS is required for hosted parent cookies and PWA installation. Deploy configuration does not implement account isolation or change this boundary.
+This is still a **single-household MVP**, not a multi-user SaaS. The parent password protects editing from child mode; it does not authenticate every read of the site, profile, or photo API. Put a household deployment behind an access-controlled gateway/proxy before adding private family photos, or add full household authentication first. HTTPS is required for hosted parent cookies and PWA installation. Deploy configuration does not implement account isolation or change this boundary.
+
+## First launch and upgrading
+
+There is no required `PARENT_PIN` or password environment variable. On first launch, set and confirm your parent password in the app before allowing public access. The password is stored as a salted scrypt hash in PostgreSQL. Keep the separately generated `PARENT_SESSION_SECRET` stable for session signing. An unclaimed household can be set up by its first visitor, so complete setup behind private access. Full household read authentication is still outside this release.
+
+For an existing PIN-based deployment, retain its old `PARENT_PIN` for the upgrade. The setup screen asks for it once before allowing a password to be created. Then remove `PARENT_PIN`; it is ignored after a password is set. Migrations add the credential, child practice-level setting, and mission progress without resetting existing content or vocabulary. Repeated seeds leave credentials and progress intact. Password changes from Parent area invalidate other parent cookies. See README for administrator-managed recovery; there is no email reset flow.

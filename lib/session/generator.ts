@@ -8,6 +8,7 @@ export type GeneratorInput = {
   category?: string;
   seed?: number;
   includeMissions?: boolean;
+  practiceLevel?: number;
 };
 function random(seed: number) {
   let x = seed >>> 0;
@@ -25,9 +26,16 @@ export class SessionGenerator {
     category,
     seed = 1,
     includeMissions = false,
+    practiceLevel = 0,
   }: GeneratorInput): GeneratedCard[] {
     if (![5, 8, 10, 12].includes(numberOfCards))
       throw new Error("Choose 5, 8, 10, or 12 cards.");
+    if (
+      !Number.isInteger(practiceLevel) ||
+      practiceLevel < 0 ||
+      practiceLevel > 4
+    )
+      throw new Error("Choose automatic progression or a level from 1 to 4.");
     const wordCount = includeMissions
       ? numberOfCards - Math.floor(numberOfCards / 5)
       : numberOfCards;
@@ -105,7 +113,7 @@ export class SessionGenerator {
       if (v?.status === "LEARNING")
         level = Math.min(2, Math.max(1, v.comfortableLevel));
       // Counts alone never unlock richer levels. A parent must first confirm comfort.
-      return { conceptId: c.id, levelShown: level, sequence };
+      return { conceptId: c.id, levelShown: practiceLevel || level, sequence };
     });
   }
 }

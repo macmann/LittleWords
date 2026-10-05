@@ -44,6 +44,7 @@ export type Profile = {
   primaryLanguage: Language;
   enabledLanguages: Language[];
   cardsPerSession: number;
+  practiceLevel: number;
 };
 export type Bootstrap = {
   profile: Profile;
@@ -51,6 +52,8 @@ export type Bootstrap = {
   categories: Category[];
   vocabulary: Vocabulary[];
   demo: boolean;
+  security: { configured: boolean; legacyPinRequired: boolean };
+  missionProgress: TrackProgress[];
 };
 export type GeneratedCard = {
   conceptId: string;
@@ -58,7 +61,16 @@ export type GeneratedCard = {
   sequence: number;
 };
 export type Session = {
+  resumeSequence?: number;
+  missionId?: string | null;
   id: string;
   cards: GeneratedCard[];
   language: Language;
+};
+
+export type TrackProgress = {
+  missionId: string;
+  language: Language;
+  completedAt: string | null;
+  readyToConfirm: boolean;
 };
