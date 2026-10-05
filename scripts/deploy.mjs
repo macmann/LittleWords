@@ -4,6 +4,7 @@ import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import dotenv from "dotenv";
+import { migrateLegacyUploads } from "../lib/storage/migrate.mjs";
 import { deploymentConfig } from "../lib/deployment/config.mjs";
 
 process.env.NODE_ENV = "production";
@@ -62,6 +63,7 @@ try {
     await unlink(probe).catch(() => {});
   }
   console.log("[deploy] Upload directory is writable.");
+  await migrateLegacyUploads(config.uploadDir);
   await run(
     [require.resolve("prisma/build/index.js"), "migrate", "deploy"],
     "Database migration",

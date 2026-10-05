@@ -2605,3 +2605,107 @@ details label {
     animation: none;
   }
 }
+
+.account-page {
+  min-height: 100dvh;
+  max-width: 1080px;
+  margin: auto;
+  padding: 50px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 50px;
+  align-items: start;
+}
+.account-intro {
+  padding-top: 60px;
+  position: sticky;
+  top: 40px;
+}
+.account-intro h1 {
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1.2;
+  margin: 30px 0 20px;
+}
+.account-intro p {
+  line-height: 1.8;
+  max-width: 370px;
+}
+.account-promise {
+  display: flex;
+  gap: 12px;
+  margin-top: 25px;
+  color: var(--green);
+  align-items: center;
+}
+.account-card {
+  min-width: 0;
+}
+.account-card h2 {
+  font-size: 28px;
+  margin: 22px 0 12px;
+}
+.account-card p {
+  line-height: 1.7;
+}
+.account-tabs {
+  display: flex;
+  padding: 5px;
+  gap: 5px;
+  border-radius: 14px;
+  background: var(--mint);
+}
+.account-tabs button {
+  flex: 1;
+  min-height: 46px;
+  font-weight: 600;
+}
+.account-tabs button[aria-pressed="true"] {
+  background: white;
+}
+.age-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.age-fields label {
+  min-width: 0;
+}
+.account-footer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  margin-top: 25px;
+}
+.account-footer svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.legacy-link {
+  margin-top: 18px;
+  text-align: left;
+}
+@media (max-width: 760px) {
+  .account-page {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 24px 16px;
+  }
+  .account-intro {
+    position: static;
+    padding-top: 0;
+  }
+  .account-intro h1 {
+    margin: 18px 0 10px;
+    font-size: 32px;
+  }
+  .account-intro p {
+    font-size: 14px;
+  }
+  .account-promise {
+    display: none;
+  }
+  .account-card {
+    padding: 24px 20px;
+  }
+}

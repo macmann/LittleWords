@@ -15,6 +15,7 @@ export async function GET() {
       { status: 503, headers },
     );
   try {
+    await db.accountSession.findFirst({ select: { id: true } });
     const profile = await db.childProfile.findUnique({
       where: { id: "demo-child" },
       select: { id: true },

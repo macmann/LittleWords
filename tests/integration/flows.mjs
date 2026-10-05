@@ -102,24 +102,45 @@ async function expect(route, method, body, cookie, status = 200) {
   );
   return res;
 }
-function cookieFrom(res) {
-  const value = res.headers.get("set-cookie");
-  assert.ok(value?.includes("Secure"));
-  return value.split(";")[0];
+function cookieFrom(res, previous = "") {
+  const map = new Map(
+    previous
+      .split("; ")
+      .filter(Boolean)
+      .map((v) => v.split("=")),
+  );
+  for (const value of res.headers.getSetCookie()) {
+    assert.ok(value.includes("Secure"));
+    const [name, token] = value.split(";")[0].split("=");
+    map.set(name, token);
+  }
+  return [...map].map(([k, v]) => `${k}=${v}`).join("; ");
 }
-async function login(password) {
-  return cookieFrom(await expect("/api/gate", "POST", { password }));
+async function login(email, password) {
+  return cookieFrom(
+    await expect("/api/auth", "POST", { action: "login", email, password }),
+  );
 }
-async function exercise(session) {
+async function exercise(session, cookie) {
   for (const card of session.cards)
-    await expect("/api/sessions", "PATCH", {
+    await expect(
+      "/api/sessions",
+      "PATCH",
+      {
+        sessionId: session.id,
+        sequence: card.sequence,
+      },
+      cookie,
+    );
+  await expect(
+    "/api/sessions",
+    "PATCH",
+    {
       sessionId: session.id,
-      sequence: card.sequence,
-    });
-  await expect("/api/sessions", "PATCH", {
-    sessionId: session.id,
-    complete: true,
-  });
+      complete: true,
+    },
+    cookie,
+  );
 }
 async function prepareAgain() {
   const child = spawn(
@@ -135,225 +156,322 @@ try {
   schemaCreated = true;
   launch();
   await ready();
-  let bootstrap = await (await expect("/api/bootstrap", "GET")).json();
-  assert.equal(bootstrap.security.configured, false);
-  assert.equal(bootstrap.security.legacyPinRequired, false);
-  assert.equal(bootstrap.concepts.length, 73);
-  const password = "shared words test password",
-    replacement = "new shared words password";
-  const setup = { action: "setup", password, confirmation: password };
+  await expect("/api/bootstrap", "GET", undefined, undefined, 401);
+  assert.equal(
+    (await (await expect("/api/auth", "GET")).json()).authenticated,
+    false,
+  );
+  const pass = "our shared account password",
+    replacement = "replacement shared password";
+  const a = {
+    action: "signup",
+    name: "Parent A",
+    email: "ParentA@example.test",
+    password: pass,
+    confirmation: pass,
+    childName: "Child A",
+    ageMonths: 27,
+    primaryLanguage: "EN",
+  };
+  const b = {
+    ...a,
+    name: "Parent B",
+    email: "parentb@example.test",
+    childName: "Child B",
+    ageMonths: 48,
+    role: "ADMIN",
+  };
+  await expect("/api/auth", "POST", { ...a, ageMonths: -1 }, undefined, 400);
+  await expect(
+    "/api/auth",
+    "POST",
+    { ...a, confirmation: "different" },
+    undefined,
+    400,
+  );
   assert.equal(
     (
       await request(
-        "/api/gate",
+        "/api/auth",
         "POST",
-        setup,
+        a,
         undefined,
         "https://other.example.test",
       )
     ).status,
     403,
   );
-  await expect(
-    "/api/gate",
-    "POST",
-    { ...setup, confirmation: "different" },
-    undefined,
-    400,
-  );
-  await expect(
-    "/api/gate",
-    "POST",
-    { ...setup, password: "short", confirmation: "short" },
-    undefined,
-    400,
-  );
   const competing = await Promise.all([
-    request("/api/gate", "POST", setup),
-    request("/api/gate", "POST", setup),
+    request("/api/auth", "POST", a),
+    request("/api/auth", "POST", a),
   ]);
   assert.deepEqual(competing.map((r) => r.status).sort(), [200, 409]);
-  let cookie = cookieFrom(competing.find((r) => r.status === 200));
-  const credential = await db.parentCredential.findUnique({
-    where: { id: "household" },
+  let cookieA = cookieFrom(competing.find((r) => r.status === 200)),
+    cookieB = cookieFrom(await expect("/api/auth", "POST", b));
+  let dataA = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  let dataB = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieB)
+  ).json();
+  assert.equal(dataA.profile.ageMonths, 27);
+  assert.equal(dataB.profile.ageMonths, 48);
+  assert.equal(dataA.account.email, "parenta@example.test");
+  assert.equal(dataB.account.role, "PARENT");
+  assert.notEqual(dataA.profile.id, dataB.profile.id);
+  assert.equal(dataA.concepts.length, 145);
+  assert.ok(
+    !JSON.stringify(dataA).includes("passwordHash") &&
+      !JSON.stringify(dataA).includes("tokenHash"),
+  );
+  const userA = await db.user.findUnique({
+    where: { email: "parenta@example.test" },
   });
   assert.ok(
-    credential.passwordHash.startsWith("scrypt:") &&
-      !credential.passwordHash.includes(password),
+    userA.passwordHash.startsWith("scrypt:") &&
+      !userA.passwordHash.includes(pass),
   );
-  await expect(
-    "/api/gate",
-    "POST",
-    { ...setup, password: replacement, confirmation: replacement },
-    undefined,
-    409,
+  const accountToken = cookieA
+    .split("; ")
+    .find((v) => v.startsWith("lw-account="))
+    .split("=")[1];
+  assert.equal(
+    await db.accountSession.count({ where: { tokenHash: accountToken } }),
+    0,
   );
-  await expect(
-    "/api/gate",
-    "POST",
-    { password: "not the password" },
-    undefined,
-    401,
+  console.log(
+    "Signup is immediate, email is normalized, child age is saved, passwords/session tokens are hashed, and role injection is rejected.",
   );
-  cookie = await login(password);
-  bootstrap = await (await expect("/api/bootstrap", "GET")).json();
-  assert.equal(bootstrap.security.configured, true);
-  assert.ok(!JSON.stringify(bootstrap).includes("passwordHash"));
-  const input = { childId: "demo-child", language: "EN", numberOfCards: 5 };
+  const input = { childId: dataA.profile.id, language: "EN", numberOfCards: 5 };
+  await expect("/api/sessions", "POST", input, undefined, 401);
+  await expect("/api/sessions", "POST", input, cookieB, 404);
   await expect(
-    "/api/sessions",
-    "POST",
-    { ...input, missionId: "name-vehicles" },
-    undefined,
-    401,
+    "/api/vocabulary",
+    "PATCH",
+    { conceptId: "truck", status: "KNOWN" },
+    cookieA,
   );
-  await expect(
-    "/api/sessions",
-    "POST",
-    { ...input, missionId: "sentence-actions" },
-    cookie,
-    409,
+  assert.equal(
+    (await (await expect("/api/bootstrap", "GET", undefined, cookieB)).json())
+      .vocabulary.length,
+    0,
   );
   await expect(
     "/api/profile",
     "PATCH",
-    { ...bootstrap.profile, practiceLevel: 4 },
-    undefined,
-    401,
+    { ...dataA.profile, practiceLevel: 4 },
+    cookieA,
   );
-  await expect(
-    "/api/profile",
-    "PATCH",
-    { ...bootstrap.profile, practiceLevel: 4 },
-    cookie,
-  );
-  const regular = await (
-    await expect("/api/sessions", "POST", { ...input, practiceLevel: 1 })
+  const session = await (
+    await expect("/api/sessions", "POST", input, cookieA)
   ).json();
-  assert.ok(regular.cards.every((c) => c.levelShown === 4));
+  assert.ok(session.cards.every((c) => c.levelShown === 4));
+  await expect(
+    "/api/sessions",
+    "PATCH",
+    { sessionId: session.id, sequence: 0 },
+    cookieB,
+    404,
+  );
+  for (let i = 0; i < 2; i++)
+    await expect(
+      "/api/sessions",
+      "PATCH",
+      { sessionId: session.id, sequence: 0 },
+      cookieA,
+    );
+  dataA = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  assert.equal(dataA.resumeSession.id, session.id);
+  assert.equal(dataA.resumeSession.resumeSequence, 1);
+  assert.equal(dataA.progressSummary.cardsSeen, 1);
+  await exercise(session, cookieA);
+  dataA = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  assert.equal(dataA.progressSummary.sessionsCompleted, 1);
+  assert.equal(dataA.resumeSession, null);
+  cookieA = cookieFrom(
+    await expect("/api/gate", "DELETE", undefined, cookieA),
+    cookieA,
+  );
+  await expect(
+    "/api/vocabulary",
+    "PATCH",
+    { conceptId: "car", status: "KNOWN" },
+    cookieA,
+    401,
+  );
+  cookieA = cookieFrom(
+    await expect("/api/gate", "POST", { password: pass }, cookieA),
+    cookieA,
+  );
+  const bytes = await import("node:fs/promises").then((fs) =>
+    fs.readFile("public/icons/icon-192.png"),
+  );
+  const form = new FormData();
+  form.append("file", new Blob([bytes], { type: "image/png" }), "cup.png");
+  const uploaded = await fetch(base + "/api/upload", {
+    method: "POST",
+    headers: { Origin: base, Cookie: cookieA },
+    body: form,
+  });
+  assert.equal(uploaded.status, 200);
+  const photoUrl = (await uploaded.json()).url;
+  await expect(photoUrl, "GET", undefined, undefined, 401);
+  await expect(photoUrl, "GET", undefined, cookieB, 404);
+  const photo = await expect(photoUrl, "GET", undefined, cookieA);
+  assert.ok(Buffer.from(await photo.arrayBuffer()).equals(bytes));
+  assert.equal(photo.headers.get("cache-control"), "private, no-store");
+  await expect(
+    "/uploads/" + photoUrl.split("/").at(-1),
+    "GET",
+    undefined,
+    cookieA,
+    404,
+  );
+  const card = {
+    slug: "my-cup",
+    categoryId: "home",
+    imageUrl: photoUrl,
+    type: "OBJECT",
+    difficulty: 1,
+    active: true,
+    custom: true,
+    translations: dataA.concepts.find((c) => c.slug === "cup").translations,
+  };
+  const saved = await (
+    await expect("/api/concepts", "POST", card, cookieA)
+  ).json();
+  await expect("/api/concepts", "POST", card, cookieB, 404);
+  const other = await (
+    await expect(
+      "/api/concepts",
+      "POST",
+      { ...card, imageUrl: "/images/home/cup.svg" },
+      cookieB,
+    )
+  ).json();
+  assert.notEqual(saved.slug, other.slug);
+  await expect(
+    "/api/concepts",
+    "POST",
+    { ...card, id: saved.id },
+    cookieB,
+    404,
+  );
+  await expect(
+    "/api/vocabulary",
+    "PATCH",
+    { conceptId: saved.id, status: "KNOWN" },
+    cookieB,
+    404,
+  );
+  await expect(
+    "/api/concepts",
+    "POST",
+    { ...card, custom: false, imageUrl: "/images/home/cup.svg" },
+    cookieB,
+    403,
+  );
+  dataB = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieB)
+  ).json();
+  assert.ok(!dataB.concepts.some((c) => c.id === saved.id));
+  assert.ok(dataB.concepts.some((c) => c.id === other.id));
+  assert.equal(dataB.progressSummary.cardsSeen, 0);
   const first = await (
     await expect(
       "/api/sessions",
       "POST",
       { ...input, missionId: "name-vehicles" },
-      cookie,
+      cookieA,
     )
   ).json();
-  assert.equal(first.cards.length, 4);
   assert.ok(first.cards.every((c) => c.levelShown === 1));
-  const confirmation = {
-    missionId: "name-vehicles",
-    language: "EN",
-    offlineDone: true,
-  };
-  await expect("/api/track", "PATCH", confirmation, cookie, 409);
+  await expect(
+    "/api/track",
+    "PATCH",
+    { missionId: first.missionId, language: "EN", offlineDone: true },
+    cookieA,
+    409,
+  );
   await expect(
     "/api/sessions",
     "PATCH",
     { sessionId: first.id, complete: true },
-    undefined,
+    cookieA,
     409,
   );
-  await expect("/api/sessions", "PATCH", {
-    sessionId: first.id,
-    sequence: first.cards[0].sequence,
-  });
+  await expect(
+    "/api/sessions",
+    "PATCH",
+    { sessionId: first.id, sequence: 0 },
+    cookieA,
+  );
   const resumed = await (
     await expect(
       "/api/sessions",
       "POST",
       { ...input, missionId: first.missionId },
-      cookie,
+      cookieA,
     )
   ).json();
   assert.equal(resumed.id, first.id);
   assert.equal(resumed.resumeSequence, 1);
-  for (const card of first.cards) {
-    const before = await db.childVocabulary.findUnique({
-      where: {
-        childId_conceptId: { childId: "demo-child", conceptId: card.conceptId },
-      },
-    });
-    for (let i = 0; i < 2; i++)
-      await expect("/api/sessions", "PATCH", {
-        sessionId: first.id,
-        sequence: card.sequence,
-      });
-    const after = await db.childVocabulary.findUnique({
-      where: {
-        childId_conceptId: { childId: "demo-child", conceptId: card.conceptId },
-      },
-    });
-    assert.equal(
-      after.seenCount,
-      (before?.seenCount || 0) + (card.sequence === 0 ? 0 : 1),
-    );
-  }
-  await expect("/api/sessions", "PATCH", {
-    sessionId: first.id,
-    complete: true,
-  });
-  await expect("/api/track", "PATCH", confirmation, undefined, 401);
+  await exercise(first, cookieA);
   await expect(
     "/api/track",
     "PATCH",
-    { ...confirmation, offlineDone: false },
-    cookie,
-    400,
-  );
-  await expect("/api/track", "PATCH", confirmation, cookie);
-  const confirmedAt = (
-    await db.missionProgress.findFirst({
-      where: { missionId: first.missionId, language: "EN" },
-    })
-  ).completedAt.toISOString();
-  await expect("/api/track", "PATCH", confirmation, cookie);
-  assert.equal(
-    (
-      await db.missionProgress.findFirst({
-        where: { missionId: first.missionId, language: "EN" },
-      })
-    ).completedAt.toISOString(),
-    confirmedAt,
+    { missionId: first.missionId, language: "EN", offlineDone: true },
+    cookieA,
   );
   await expect(
     "/api/sessions",
     "POST",
-    { ...input, missionId: "name-home", language: "DE" },
-    cookie,
+    {
+      childId: dataB.profile.id,
+      language: "EN",
+      numberOfCards: 5,
+      missionId: "name-home",
+    },
+    cookieB,
     409,
   );
   console.log(
-    "First-run setup is atomic, password-only access is enforced, and missions require seen cards plus parent confirmation in the same language.",
+    "Two accounts cannot access each other's child/session/card/photo data; parent gates are retained and progress/resume are account-specific.",
   );
-  const oldCookie = cookie;
-  await expect(
-    "/api/gate",
-    "PATCH",
-    {
-      currentPassword: "wrong",
-      password: replacement,
-      confirmation: replacement,
-    },
-    cookie,
-    401,
-  );
-  cookie = cookieFrom(
+  const device2 = await login(a.email, pass);
+  const oldGate = cookieA.split("; ").find((v) => v.startsWith("lw-parent="));
+  cookieA = cookieFrom(
     await expect(
       "/api/gate",
       "PATCH",
       {
-        currentPassword: password,
+        currentPassword: pass,
         password: replacement,
         confirmation: replacement,
       },
-      cookie,
+      cookieA,
     ),
+    cookieA,
   );
-  await expect("/api/gate", "GET", undefined, oldCookie, 401);
-  await expect("/api/gate", "GET", undefined, cookie);
-  await expect("/api/gate", "POST", { password }, undefined, 401);
-  cookie = await login(replacement);
+  await expect("/api/bootstrap", "GET", undefined, device2, 401);
+  const stale = cookieA
+    .split("; ")
+    .filter((v) => !v.startsWith("lw-parent="))
+    .concat(oldGate)
+    .join("; ");
+  await expect("/api/gate", "GET", undefined, stale, 401);
+  await expect(
+    "/api/auth",
+    "POST",
+    { action: "login", email: a.email, password: pass },
+    undefined,
+    401,
+  );
+  cookieA = await login(a.email, replacement);
   const path = [
     "name-home",
     "name-actions",
@@ -369,86 +487,110 @@ try {
   ];
   for (let i = 0; i < path.length; i++) {
     const missionId = path[i];
-    const session = await (
-      await expect("/api/sessions", "POST", { ...input, missionId }, cookie)
+    const mission = await (
+      await expect("/api/sessions", "POST", { ...input, missionId }, cookieA)
     ).json();
     assert.ok(
-      session.cards.every((c) => c.levelShown === Math.floor((i + 1) / 3) + 1),
+      mission.cards.every((c) => c.levelShown === Math.floor((i + 1) / 3) + 1),
     );
-    await exercise(session);
+    await exercise(mission, cookieA);
     await expect(
       "/api/track",
       "PATCH",
       { missionId, language: "EN", offlineDone: true },
-      cookie,
+      cookieA,
     );
   }
-  const saved = JSON.stringify({
-    credential: await db.parentCredential.findMany(),
-    progress: await db.missionProgress.findMany({
-      orderBy: { missionId: "asc" },
-    }),
-    vocabulary: await db.childVocabulary.findMany({
-      orderBy: { conceptId: "asc" },
-    }),
-    profile: await db.childProfile.findMany(),
-  });
+  const snapshot = async () =>
+    JSON.stringify({
+      users: await db.user.findMany({ orderBy: { id: "asc" } }),
+      profiles: await db.childProfile.findMany({ orderBy: { id: "asc" } }),
+      vocabulary: await db.childVocabulary.findMany({ orderBy: { id: "asc" } }),
+      progress: await db.missionProgress.findMany({ orderBy: { id: "asc" } }),
+    });
+  const before = await snapshot();
   await prepareAgain();
-  assert.ok(
-    saved ===
-      JSON.stringify({
-        credential: await db.parentCredential.findMany(),
-        progress: await db.missionProgress.findMany({
-          orderBy: { missionId: "asc" },
-        }),
-        vocabulary: await db.childVocabulary.findMany({
-          orderBy: { conceptId: "asc" },
-        }),
-        profile: await db.childProfile.findMany(),
-      }),
-    "Repeated migration/seed preserves password, mission progress, vocabulary, and settings.",
-  );
+  assert.ok(before === (await snapshot()));
   await stop();
   launch();
   await ready();
-  bootstrap = await (await expect("/api/bootstrap", "GET")).json();
-  assert.equal(
-    bootstrap.missionProgress.filter((p) => p.completedAt).length,
-    12,
-  );
-  await expect("/api/gate", "GET", undefined, cookie);
+  dataA = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  assert.equal(dataA.missionProgress.filter((p) => p.completedAt).length, 12);
+  assert.equal(dataA.profile.ageMonths, 27);
+  const restored = await expect(photoUrl, "GET", undefined, cookieA);
+  assert.ok(Buffer.from(await restored.arrayBuffer()).equals(bytes));
+  await expect("/api/auth", "DELETE", undefined, cookieA);
+  await expect("/api/bootstrap", "GET", undefined, cookieA, 401);
+  cookieA = await login(a.email, replacement);
+  dataA = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  assert.equal(dataA.missionProgress.filter((p) => p.completedAt).length, 12);
   console.log(
-    "All 12 missions advance through four authored levels; password rotation revokes old cookies; saved settings and progress survive repeat seeds and server restart.",
+    "All 12 mission stages, private photos, age, vocabulary and progress survive reseeding, restart, logout and login; password changes revoke other devices.",
   );
-  // Simulate an old PIN deployment in this disposable schema only.
-  await db.parentCredential.deleteMany();
-  await stop();
-  launch({ PARENT_PIN: "2468" });
-  await ready();
-  bootstrap = await (await expect("/api/bootstrap", "GET")).json();
-  assert.equal(bootstrap.security.legacyPinRequired, true);
-  await expect("/api/gate", "POST", setup, undefined, 401);
-  cookie = cookieFrom(
-    await expect("/api/gate", "POST", { ...setup, legacyPin: "2468" }),
+  // Only the old household's password can attach its records; new signups cannot claim them.
+  await db.parentCredential.create({
+    data: { id: "household", passwordHash: userA.passwordHash },
+  });
+  await expect(
+    "/api/auth",
+    "POST",
+    {
+      ...a,
+      action: "adopt",
+      email: "legacy@example.test",
+      legacyPassword: "wrong",
+    },
+    undefined,
+    401,
   );
-  await expect("/api/gate", "POST", { password: "2468" }, undefined, 401);
-  await expect("/api/gate", "GET", undefined, cookie);
-  assert.equal(
-    await db.missionProgress.count({ where: { completedAt: { not: null } } }),
-    12,
+  const legacyCookie = cookieFrom(
+    await expect("/api/auth", "POST", {
+      ...a,
+      action: "adopt",
+      email: "legacy@example.test",
+      legacyPassword: pass,
+      ageMonths: 36,
+    }),
   );
-  cookie = await login(password);
+  const legacy = await (
+    await expect("/api/bootstrap", "GET", undefined, legacyCookie)
+  ).json();
+  assert.equal(legacy.profile.id, "demo-child");
+  assert.equal(legacy.account.role, "ADMIN");
+  assert.equal(legacy.vocabulary.filter((v) => v.status === "KNOWN").length, 8);
+  await expect(
+    "/api/auth",
+    "POST",
+    {
+      ...a,
+      action: "adopt",
+      email: "secondlegacy@example.test",
+      legacyPassword: pass,
+    },
+    undefined,
+    401,
+  );
   for (let i = 0; i < 5; i++)
     await expect(
-      "/api/gate",
+      "/api/auth",
       "POST",
-      { password: "wrong password" },
+      { action: "login", email: b.email, password: "wrong" },
       undefined,
       401,
     );
-  await expect("/api/gate", "POST", { password }, undefined, 429);
+  await expect(
+    "/api/auth",
+    "POST",
+    { action: "login", email: b.email, password: pass },
+    undefined,
+    429,
+  );
   console.log(
-    "Legacy PIN authorizes the one-time upgrade; it no longer unlocks parent tools after setup. Integration checks passed.",
+    "Legacy adoption requires the old password, preserves known words, and cannot be repeated. Login throttling and all account integration checks passed.",
   );
 } catch (error) {
   console.error(error.message);

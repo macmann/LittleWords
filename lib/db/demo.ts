@@ -8,6 +8,9 @@ import type { Bootstrap } from "@/types";
 export function demoData(): Bootstrap {
   return {
     demo: true,
+    account: { name: "Demo Parent", email: null, role: "PARENT" },
+    progressSummary: { sessionsCompleted: 0, cardsSeen: 0 },
+    resumeSession: null,
     security: { configured: false, legacyPinRequired: false },
     missionProgress: [],
     categories,
@@ -19,6 +22,8 @@ export function demoData(): Bootstrap {
       enabledLanguages: ["EN", "MY", "DE"],
       cardsPerSession: 10,
       practiceLevel: 0,
+      ageMonths: 36,
+      ageRecordedAt: null,
     },
     vocabulary: concepts.map((c) => ({
       conceptId: c.id,

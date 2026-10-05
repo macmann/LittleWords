@@ -45,6 +45,8 @@ export type Profile = {
   enabledLanguages: Language[];
   cardsPerSession: number;
   practiceLevel: number;
+  ageMonths: number | null;
+  ageRecordedAt: string | null;
 };
 export type Bootstrap = {
   profile: Profile;
@@ -52,6 +54,9 @@ export type Bootstrap = {
   categories: Category[];
   vocabulary: Vocabulary[];
   demo: boolean;
+  account: { name: string; email: string | null; role: "PARENT" | "ADMIN" };
+  progressSummary: { sessionsCompleted: number; cardsSeen: number };
+  resumeSession: Session | null;
   security: { configured: boolean; legacyPinRequired: boolean };
   missionProgress: TrackProgress[];
 };

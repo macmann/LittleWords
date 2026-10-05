@@ -27,11 +27,22 @@ enum ConceptType {
   PERSON
 }
 
+enum UserRole {
+  PARENT
+  ADMIN
+}
+
 model User {
-  id        String         @id @default(cuid())
-  email     String?        @unique
-  createdAt DateTime       @default(now())
-  children  ChildProfile[]
+  id              String           @id @default(cuid())
+  email           String?          @unique
+  name            String           @default("Parent")
+  passwordHash    String?
+  sessionVersion  String           @default(uuid())
+  role            UserRole         @default(PARENT)
+  accountSessions AccountSession[]
+  photos          PhotoAsset[]
+  createdAt       DateTime         @default(now())
+  children        ChildProfile[]
 }
 
 model ChildProfile {
@@ -40,6 +51,8 @@ model ChildProfile {
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   name             String
   birthDate        DateTime?
+  ageMonths        Int?
+  ageRecordedAt    DateTime?
   primaryLanguage  Language          @default(EN)
   enabledLanguages Language[]        @default([EN, MY, DE])
   cardsPerSession  Int               @default(10)
@@ -158,4 +171,26 @@ model MissionProgress {
   createdAt   DateTime         @default(now())
 
   @@unique([childId, missionId, language])
+}
+
+model AccountSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PhotoAsset {
+  id        String   @id @default(cuid())
+  filename  String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

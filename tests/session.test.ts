@@ -54,10 +54,14 @@ test("50/30/20 weighting with populated vocabulary pools", () => {
   assert.deepEqual(counts, { KNOWN: 5, LEARNING: 3, NEW: 2 });
 });
 test("category selection remains finite when fewer cards exist", () => {
+  const sparseConcepts = data.concepts
+    .filter((c) => c.categoryId === "family")
+    .slice(0, 2);
   const cards = generator.generate({
     ...data,
     language: "MY",
     numberOfCards: 12,
+    concepts: sparseConcepts,
     category: "family",
   });
   assert.equal(cards.length, 2);

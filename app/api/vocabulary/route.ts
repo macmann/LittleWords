@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { apiError, requireDatabase } from "@/lib/db/http";
+import { accountContext } from "@/lib/security/account";
 import { protectParent } from "@/lib/parent-auth";
 const schema = z.object({
   conceptId: z.string().min(1),
@@ -10,6 +11,8 @@ const schema = z.object({
   favorite: z.boolean().optional(),
 });
 export async function PATCH(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   const denied = (await protectParent()) ?? requireDatabase();
   if (denied) return denied;
   try {
@@ -17,15 +20,17 @@ export async function PATCH(req: NextRequest) {
     const concept = await db.concept.findFirst({
       where: {
         id: conceptId,
-        OR: [{ childId: null }, { childId: "demo-child" }],
+        OR: [{ childId: null }, { childId: context.account.child.id }],
       },
     });
     if (!concept)
       return NextResponse.json({ error: "Card not found." }, { status: 404 });
     const v = await db.childVocabulary.upsert({
-      where: { childId_conceptId: { childId: "demo-child", conceptId } },
+      where: {
+        childId_conceptId: { childId: context.account.child.id, conceptId },
+      },
       create: {
-        childId: "demo-child",
+        childId: context.account.child.id,
         conceptId,
         ...values,
         parentConfirmed: values.status === "KNOWN",

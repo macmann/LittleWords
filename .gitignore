@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 *.tsbuildinfo
 public/uploads/
+
+var/uploads/

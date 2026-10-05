@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { accountContext } from "@/lib/security/account";
 import { protectParent } from "@/lib/parent-auth";
 import { storage } from "@/lib/storage";
 export async function POST(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   const denied = await protectParent();
   if (denied) return denied;
   const length = Number(req.headers.get("content-length"));
@@ -33,7 +37,18 @@ export async function POST(req: NextRequest) {
         { error: "Please use a JPG, PNG, or WebP image." },
         { status: 400 },
       );
-    return NextResponse.json({ url: await storage().save(data, extension) });
+    const adapter = storage();
+    const url = await adapter.save(data, extension);
+    const filename = url.split("/").at(-1)!;
+    try {
+      await db.photoAsset.create({
+        data: { filename, userId: context.account.user.id },
+      });
+    } catch (e) {
+      await adapter.remove(filename).catch(() => {});
+      throw e;
+    }
+    return NextResponse.json({ url });
   } catch {
     return NextResponse.json(
       { error: "Photo could not be saved. Please try again." },
