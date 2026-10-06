@@ -27,7 +27,7 @@ import { VocabularyManager } from "./parent/words";
 import { ContentEditor } from "./parent/content-editor";
 import { Settings } from "./parent/settings";
 import { MissionTrack } from "./parent/mission-track";
-import { FirstRunSetup } from "./parent/password-form";
+import { AccountScreen } from "./parent/account-screen";
 import { audioService } from "@/lib/audio/service";
 type Page =
   "home" | "words" | "categories" | "world" | "parent" | "admin" | "track";
@@ -45,6 +45,7 @@ const nav: {
 ];
 export function AppShell() {
   const [data, setData] = useState<Bootstrap | null>(null),
+    [needsAuth, setNeedsAuth] = useState(false),
     [loadError, setLoadError] = useState(""),
     [page, setPage] = useState<Page>("home"),
     [session, setSession] = useState<Session | null>(null),
@@ -62,7 +63,17 @@ export function AppShell() {
     try {
       const res = await fetch("/api/bootstrap", { cache: "no-store" });
       const value = await res.json();
+      if (res.status === 401) {
+        setData(null);
+        setSession(null);
+        setParent(false);
+        setPending(null);
+        setPendingAction(null);
+        setNeedsAuth(true);
+        return;
+      }
       if (!res.ok) throw new Error(value.error);
+      setNeedsAuth(false);
       setData(value);
       setLoadError("");
     } catch (e) {
@@ -181,6 +192,38 @@ export function AppShell() {
     setParent(false);
     setPage("home");
   }
+  async function signOut() {
+    try {
+      const res = await fetch("/api/auth", { method: "DELETE" });
+      if (!res.ok) throw new Error("Could not sign out. Please try again.");
+      audioService.stop();
+      setSession(null);
+      setData(null);
+      setParent(false);
+      setPage("home");
+      setNeedsAuth(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not sign out.");
+    }
+  }
+  async function resume() {
+    if (!data?.resumeSession) return;
+    audioService.stop();
+    setSession(data.resumeSession);
+    setParent(false);
+    await fetch("/api/gate", { method: "DELETE" });
+  }
+  if (needsAuth)
+    return (
+      <AccountScreen
+        onSignedIn={() => {
+          setNeedsAuth(false);
+          setParent(true);
+          setPage("home");
+          void refresh();
+        }}
+      />
+    );
   if (!data)
     return (
       <main className="loading-page">
@@ -203,24 +246,6 @@ export function AppShell() {
           </>
         )}
       </main>
-    );
-  if (!data.demo && !data.security.configured)
-    return (
-      <FirstRunSetup
-        legacyPinRequired={data.security.legacyPinRequired}
-        onSaved={() => {
-          setParent(true);
-          setData((current) =>
-            current
-              ? {
-                  ...current,
-                  security: { configured: true, legacyPinRequired: false },
-                }
-              : current,
-          );
-          void refresh();
-        }}
-      />
     );
   if (session)
     return (
@@ -289,7 +314,9 @@ export function AppShell() {
             <ChevronRight size={17} />
           </button>
           <div className="profile-mini">
-            <span className="profile-avatar">D</span>
+            <span className="profile-avatar">
+              {data.profile.name[0]?.toUpperCase()}
+            </span>
             <div>
               <strong>{data.profile.name}</strong>
               <small>{parent ? "Parent mode" : "Learning together"}</small>
@@ -335,7 +362,9 @@ export function AppShell() {
               enabled={data.profile.enabledLanguages}
               onChange={setLanguage}
             />
-            <span className="profile-avatar top-avatar">D</span>
+            <span className="profile-avatar top-avatar">
+              {data.profile.name[0]?.toUpperCase()}
+            </span>
           </div>
         </header>
         <main className="main-content">
@@ -425,6 +454,24 @@ export function AppShell() {
                   </div>
                 </div>
               </section>
+              {data.resumeSession && (
+                <button
+                  className="home-track-banner"
+                  onClick={() => void resume()}
+                >
+                  <span className="round-symbol">
+                    <BookOpen size={25} />
+                  </span>
+                  <div>
+                    <h3>Continue our cards</h3>
+                    <p>
+                      Your place is saved. Pick up at card{" "}
+                      {(data.resumeSession.resumeSequence ?? 0) + 1}.
+                    </p>
+                  </div>
+                  <ArrowRight size={21} />
+                </button>
+              )}
               <button
                 className="home-track-banner"
                 onClick={() => void navigate("track")}
@@ -604,6 +651,7 @@ export function AppShell() {
               browserVoice={browserVoice}
               onVoiceChange={voice}
               onAdmin={() => void navigate("admin")}
+              onSignOut={() => void signOut()}
             />
           )}
         </main>

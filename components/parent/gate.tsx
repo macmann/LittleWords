@@ -39,7 +39,9 @@ export function ParentGate({
           <LockKeyhole size={30} />
         </div>
         <h2 id="gate-title">A space for grown-ups</h2>
-        <p>Enter your parent password to manage words, photos, and settings.</p>
+        <p>
+          Enter your account password to manage words, photos, and settings.
+        </p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();

@@ -10,12 +10,14 @@ export function Settings({
   browserVoice,
   onVoiceChange,
   onAdmin,
+  onSignOut,
 }: {
   data: Bootstrap;
   onRefresh: () => void;
   browserVoice: boolean;
   onVoiceChange: (v: boolean) => void;
   onAdmin: () => void;
+  onSignOut: () => void;
 }) {
   const [profile, setProfile] = useState<Profile>(data.profile),
     [error, setError] = useState(""),
@@ -71,6 +73,57 @@ export function Settings({
               onChange={(e) => setProfile({ ...profile, name: e.target.value })}
             />
           </label>
+          <fieldset>
+            <legend>Child's age at last update</legend>
+            <div className="age-fields">
+              <label>
+                Years
+                <select
+                  aria-label="Years"
+                  value={Math.floor((profile.ageMonths ?? 24) / 12)}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      ageMonths:
+                        Number(e.target.value) * 12 +
+                        ((profile.ageMonths ?? 24) % 12),
+                    })
+                  }
+                >
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <option value={i} key={i}>
+                      {i}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Months
+                <select
+                  aria-label="Months"
+                  value={(profile.ageMonths ?? 24) % 12}
+                  onChange={(e) =>
+                    setProfile({
+                      ...profile,
+                      ageMonths:
+                        Math.floor((profile.ageMonths ?? 24) / 12) * 12 +
+                        Number(e.target.value),
+                    })
+                  }
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option value={i} key={i}>
+                      {i}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="field-help">
+              You can update this as they grow. Age does not automatically raise
+              the phrase level.
+            </p>
+          </fieldset>
           <label>
             Primary language
             <select
@@ -172,6 +225,20 @@ export function Settings({
         <div className="settings-aside">
           <article className="settings-card">
             <ShieldCheck size={26} />
+            <h2>Your account</h2>
+            <p>
+              {data.account.name} · {data.account.email}
+            </p>
+            <p>
+              {data.progressSummary.sessionsCompleted} sessions explored ·{" "}
+              {data.progressSummary.cardsSeen} cards seen
+            </p>
+            <button className="secondary" onClick={onSignOut}>
+              Sign out
+            </button>
+          </article>
+          <article className="settings-card">
+            <ShieldCheck size={26} />
             <h2>Parent password</h2>
             <ParentPasswordForm onSaved={onRefresh} />
           </article>
@@ -195,18 +262,20 @@ export function Settings({
               grown-up reading aloud.
             </p>
           </article>
-          <article className="settings-card">
-            <Library size={26} />
-            <h2>Make every word feel right</h2>
-            <p>
-              Review translations, add recordings, and manage the content
-              library.
-            </p>
-            <button className="secondary" onClick={onAdmin}>
-              Open content library
-              <ArrowRight size={17} />
-            </button>
-          </article>
+          {data.account.role === "ADMIN" && (
+            <article className="settings-card">
+              <Library size={26} />
+              <h2>Make every word feel right</h2>
+              <p>
+                Review translations, add recordings, and manage the content
+                library.
+              </p>
+              <button className="secondary" onClick={onAdmin}>
+                Open content library
+                <ArrowRight size={17} />
+              </button>
+            </article>
+          )}
           <article className="guidance-note">
             <HeartIcon />
             <h3>You’re the most important part.</h3>

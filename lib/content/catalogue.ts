@@ -1,4 +1,6 @@
 import type { Category, Concept, Translation } from "@/types";
+import { additionalRows } from "./additional";
+import { additionalBurmese } from "./additional-burmese";
 import { burmese } from "./burmese";
 export const categories: Category[] = [
   ["vehicles", "Vehicles", "truck"],
@@ -92,7 +94,10 @@ papa|family|Papa/My papa/My lovely papa/Papa is here.|Papa/Mein Papa/Mein lieber
 tree|outside|Tree/Big tree/Big green tree/I can see a tree.|Baum/Großer Baum/Großer grüner Baum/Ich sehe einen Baum.
 sun|outside|Sun/Bright sun/The bright sun/The sun is shining.|Sonne/Helle Sonne/Die helle Sonne/Die Sonne scheint.
 flower|outside|Flower/Red flower/Small red flower/I can see a flower.|Blume/Rote Blume/Kleine rote Blume/Ich sehe eine Blume.`;
-export const concepts: Concept[] = rows.split("\n").map((row) => {
+export const concepts: Concept[] = [
+  ...rows.split("\n"),
+  ...additionalRows.split("\n"),
+].map((row) => {
   const [slug, category, en, de] = row.split("|");
   const translate = (language: "EN" | "DE", value: string): Translation => {
     const [word, phraseLevel2, phraseLevel3, sentence] = value.split("/");
@@ -105,7 +110,7 @@ export const concepts: Concept[] = rows.split("\n").map((row) => {
       promptText: language === "EN" ? "What can you see?" : "Was siehst du?",
     };
   };
-  const my = burmese[slug];
+  const my = burmese[slug] || additionalBurmese[slug];
   return {
     id: slug,
     slug,
@@ -115,7 +120,18 @@ export const concepts: Concept[] = rows.split("\n").map((row) => {
       category === "actions"
         ? "ACTION"
         : category === "colors"
-          ? ["red", "blue", "green", "yellow", "black", "white"].includes(slug)
+          ? [
+              "red",
+              "blue",
+              "green",
+              "yellow",
+              "black",
+              "white",
+              "pink",
+              "purple",
+              "brown",
+              "gray",
+            ].includes(slug)
             ? "COLOR"
             : "DESCRIPTION"
           : category === "family"

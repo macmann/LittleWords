@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { accountContext } from "@/lib/security/account";
 import { protectParent } from "@/lib/parent-auth";
 import { apiError, requireDatabase } from "@/lib/db/http";
 const localUrl = z
@@ -54,12 +55,46 @@ const schema = z.object({
     }),
 });
 export async function POST(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   const denied = (await protectParent()) ?? requireDatabase();
   if (denied) return denied;
   try {
     const { id, custom, translations, ...values } = schema.parse(
       await req.json(),
     );
+    const { child, user } = context.account;
+    if (!custom && user.role !== "ADMIN")
+      return NextResponse.json(
+        { error: "Shared content is managed by the library administrator." },
+        { status: 403 },
+      );
+    if (values.imageUrl.startsWith("/api/photos/")) {
+      if (!custom)
+        return NextResponse.json(
+          { error: "Shared cards must use a public /images/ illustration." },
+          { status: 400 },
+        );
+      const filename = values.imageUrl.split("/").at(-1)!;
+      const photo = await db.photoAsset.findFirst({
+        where: { filename, userId: user.id },
+      });
+      const legacy = await db.concept.findFirst({
+        where: { childId: child.id, imageUrl: values.imageUrl },
+      });
+      if (!photo && !legacy)
+        return NextResponse.json(
+          { error: "Photo not found." },
+          { status: 404 },
+        );
+    }
+    if (custom) {
+      const prefix = `${child.id}--`;
+      const label = values.slug.startsWith(prefix)
+        ? values.slug.slice(prefix.length)
+        : values.slug;
+      values.slug = `${prefix}${label.slice(0, 64)}`;
+    }
     const clean = translations.map((t) => ({
       ...t,
       audioWordUrl: t.audioWordUrl || null,
@@ -68,10 +103,15 @@ export async function POST(req: NextRequest) {
     }));
     if (id) {
       const existing = await db.concept.findFirst({
-        where: { id, OR: [{ childId: null }, { childId: "demo-child" }] },
+        where: { id, OR: [{ childId: null }, { childId: child.id }] },
       });
       if (!existing)
         return NextResponse.json({ error: "Card not found." }, { status: 404 });
+      if (Boolean(existing.childId) !== custom)
+        return NextResponse.json(
+          { error: "The card type cannot be changed." },
+          { status: 400 },
+        );
       const concept = await db.concept.update({
         where: { id },
         data: {
@@ -94,7 +134,7 @@ export async function POST(req: NextRequest) {
       await db.concept.create({
         data: {
           ...values,
-          childId: custom ? "demo-child" : null,
+          childId: custom ? child.id : null,
           translations: { create: clean },
         },
         include: { translations: true },

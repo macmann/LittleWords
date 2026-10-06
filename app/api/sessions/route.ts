@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { apiError, hasDatabase } from "@/lib/db/http";
-import { demoData } from "@/lib/db/demo";
+import { apiError } from "@/lib/db/http";
+import { accountContext } from "@/lib/security/account";
 import { missionTrack, missionUnlocked } from "@/lib/content/track";
 import { protectParent } from "@/lib/parent-auth";
 import { sameOrigin } from "@/lib/http/origin";
 import { sessionGenerator } from "@/lib/session/generator";
 const schema = z.object({
-  childId: z.literal("demo-child"),
+  childId: z.string().min(1).max(100),
   language: z.enum(["EN", "MY", "DE"]),
   numberOfCards: z.union([
     z.literal(5),
@@ -20,10 +20,17 @@ const schema = z.object({
   missionId: z.string().max(100).optional(),
 });
 export async function POST(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   if (!sameOrigin(req.headers.get("origin"), req.headers.get("host")))
     return NextResponse.json({ error: "Please use the app." }, { status: 403 });
   try {
     const input = schema.parse(await req.json());
+    if (input.childId !== context.account.child.id)
+      return NextResponse.json(
+        { error: "Child profile not found." },
+        { status: 404 },
+      );
     const mission = input.missionId
       ? missionTrack.find((m) => m.id === input.missionId)
       : undefined;
@@ -53,25 +60,21 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         );
     }
-    const profile = hasDatabase()
-      ? await db.childProfile.findUnique({ where: { id: input.childId } })
-      : demoData().profile;
+    const profile = context.account.child;
     if (!profile || !profile.enabledLanguages.includes(input.language))
       return NextResponse.json(
         { error: "Choose a language enabled by your parent." },
         { status: 400 },
       );
-    const data = hasDatabase()
-      ? {
-          concepts: await db.concept.findMany({
-            where: { OR: [{ childId: null }, { childId: input.childId }] },
-            include: { translations: true },
-          }),
-          vocabulary: await db.childVocabulary.findMany({
-            where: { childId: input.childId },
-          }),
-        }
-      : demoData();
+    const data = {
+      concepts: await db.concept.findMany({
+        where: { OR: [{ childId: null }, { childId: profile.id }] },
+        include: { translations: true },
+      }),
+      vocabulary: await db.childVocabulary.findMany({
+        where: { childId: profile.id },
+      }),
+    };
     if (mission) {
       const progress = await db.missionProgress.findUnique({
         where: {
@@ -132,12 +135,6 @@ export async function POST(req: NextRequest) {
         { error: "No active cards in this category yet." },
         { status: 404 },
       );
-    if (!hasDatabase())
-      return NextResponse.json({
-        id: "demo-session",
-        cards,
-        language: input.language,
-      });
     const session = await db.$transaction(async (tx) => {
       const created = await tx.learningSession.create({
         data: {
@@ -177,6 +174,7 @@ export async function POST(req: NextRequest) {
     return apiError(e);
   }
 }
+class MissingSession extends Error {}
 class IncompleteMission extends Error {}
 const progress = z.object({
   sessionId: z.string().min(1),
@@ -184,18 +182,18 @@ const progress = z.object({
   complete: z.boolean().optional(),
 });
 export async function PATCH(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   if (!sameOrigin(req.headers.get("origin"), req.headers.get("host")))
     return NextResponse.json({ error: "Please use the app." }, { status: 403 });
   try {
     const input = progress.parse(await req.json());
-    if (!hasDatabase() && input.sessionId === "demo-session")
-      return NextResponse.json({ ok: true });
     await db.$transaction(async (tx) => {
       const s = await tx.learningSession.findFirst({
-        where: { id: input.sessionId, childId: "demo-child" },
+        where: { id: input.sessionId, childId: context.account.child.id },
         include: { cards: true },
       });
-      if (!s) throw new Error("Session missing");
+      if (!s) throw new MissingSession();
       if (input.sequence !== undefined) {
         const card = s.cards.find((c) => c.sequence === input.sequence);
         if (!card) throw new Error("Card missing");
@@ -237,6 +235,11 @@ export async function PATCH(req: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   } catch (e) {
+    if (e instanceof MissingSession)
+      return NextResponse.json(
+        { error: "Session not found." },
+        { status: 404 },
+      );
     if (e instanceof IncompleteMission)
       return NextResponse.json({ error: e.message }, { status: 409 });
     return apiError(e);

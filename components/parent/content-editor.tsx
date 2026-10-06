@@ -159,7 +159,13 @@ export function ContentEditor({
             <button
               className="secondary"
               onClick={() => {
-                setEditing(structuredClone(c));
+                setEditing({
+                  ...structuredClone(c),
+                  slug:
+                    custom && c.slug.startsWith(`${data.profile.id}--`)
+                      ? c.slug.slice(data.profile.id.length + 2)
+                      : c.slug,
+                });
                 setError("");
                 setLang("EN");
               }}

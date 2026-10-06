@@ -1,10 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rm,
+  mkdir,
+  writeFile,
+  access,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { deploymentConfig } from "../lib/deployment/config.mjs";
 import { sameOrigin } from "../lib/http/origin";
+import { migrateLegacyUploads } from "../lib/storage/migrate.mjs";
 import { LocalStorage } from "../lib/storage";
 
 const env = {
@@ -93,6 +101,44 @@ test("uploaded files survive recreating the storage adapter on a configured exte
   } finally {
     if (previous === undefined) delete process.env.UPLOAD_DIR;
     else process.env.UPLOAD_DIR = previous;
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("legacy photo migration removes public copies only after safe transfer and preserves conflicting originals", async () => {
+  const previous = process.cwd();
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), "littlewords-photo-move-"),
+  );
+  const source = path.join(directory, "public", "uploads");
+  const target = path.join(directory, "var", "uploads");
+  try {
+    await mkdir(source, { recursive: true });
+    process.chdir(directory);
+    await writeFile(path.join(source, "aaaa.png"), "family photo");
+    await migrateLegacyUploads(target);
+    assert.equal(
+      await readFile(path.join(target, "aaaa.png"), "utf8"),
+      "family photo",
+    );
+    await assert.rejects(access(path.join(source, "aaaa.png")));
+    await writeFile(path.join(source, "bbbb.png"), "original photo");
+    await writeFile(path.join(target, "bbbb.png"), "different photo");
+    await assert.rejects(migrateLegacyUploads(target), /conflict/);
+    assert.equal(
+      await readFile(path.join(source, "bbbb.png"), "utf8"),
+      "original photo",
+    );
+    assert.equal(
+      await readFile(path.join(target, "bbbb.png"), "utf8"),
+      "different photo",
+    );
+    await assert.rejects(
+      migrateLegacyUploads(path.join(directory, "public")),
+      /outside public/,
+    );
+  } finally {
+    process.chdir(previous);
     await rm(directory, { recursive: true, force: true });
   }
 });

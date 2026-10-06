@@ -18,7 +18,7 @@ npm run dev
 
 Create a PostgreSQL user and database using your PostgreSQL administration tool. `DATABASE_URL` follows `postgresql://USER:PASSWORD@HOST:5432/littlewords?schema=public`. URL-encode reserved characters in the password. Use a dedicated database/user with migration permissions for development; use appropriate least-privilege roles in production. Keep credentials out of version control.
 
-With no `DATABASE_URL`, the app offers a **read-only demo**. Learning, languages, categories, and missions work, but edits and session history are not persisted. If a configured database is unavailable or not seeded, the app shows a retryable error; it does not silently replace your child's data with a demo.
+Every family must create an account or sign in before accessing learning or family records. PostgreSQL is required for signup and progress; without it, the app shows a setup notice instead of exposing demo records. A configured but unavailable or unseeded database shows a retryable error.
 
 The current cloud workspace has an initialized local PostgreSQL instance. Its ignored `.env` is already configured. Cloud-only database tooling and data live outside the repository in `/workspace/.littlewords-tools`; they are not app dependencies. Start its `postgres.mjs` helper if the database process has stopped. Do not copy its credentials into documentation.
 
@@ -31,7 +31,8 @@ The current cloud workspace has an initialized local PostgreSQL instance. Its ig
 | `npx prisma generate`      | Generate the typed database client                                          |
 | `npm run test:integration` | Exercise production API flows using a disposable PostgreSQL schema          |
 | `npm run db:migrate`       | Apply the committed PostgreSQL migration                                    |
-| `npm run db:seed`          | Create demo content/profile without overwriting parent edits                |
+| `npm run db:seed`          | Insert shared content without overwriting family records                    |
+| `npm run photos:migrate`   | Move legacy public uploads into private storage without changing URLs       |
 | `npm test`                 | Run session-generation and deployment tests                                 |
 | `npm run build`            | Generate Prisma client, type-check, and build production app                |
 | `npm run deploy:prepare`   | Validate hosting settings, apply migrations, and seed without starting HTTP |
@@ -42,22 +43,32 @@ For a new schema change in a separate development task, use `npx prisma migrate 
 
 ## Environment variables
 
-| Variable                | Purpose                                                                                             |
-| ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`          | PostgreSQL connection string; unset enables the read-only demo                                      |
-| `UPLOAD_DIR`            | Absolute persistent upload directory in hosting; unset keeps `public/uploads` for local development |
-| `APP_ORIGIN`            | Optional canonical public HTTPS origin for parent requests behind a proxy                           |
-| `STORAGE_PROVIDER`      | `local` (default); another provider requires a PhotoStorage adapter                                 |
-| `TTS_PROVIDER`          | `none`; reserved for a future server-side provider, not used to call an API                         |
-| `PARENT_SESSION_SECRET` | Random secret of at least 32 characters for signed parent cookies; required in production           |
+| Variable                | Purpose                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`          | PostgreSQL connection string; required for accounts and learning                                        |
+| `UPLOAD_DIR`            | Absolute persistent upload directory in hosting; unset uses private `var/uploads` for local development |
+| `APP_ORIGIN`            | Optional canonical public HTTPS origin for parent requests behind a proxy                               |
+| `STORAGE_PROVIDER`      | `local` (default); another provider requires a PhotoStorage adapter                                     |
+| `TTS_PROVIDER`          | `none`; reserved for a future server-side provider, not used to call an API                             |
+| `PARENT_SESSION_SECRET` | Random secret of at least 32 characters for signed parent cookies; required in production               |
 
-Generate the session secret with a secure random tool and save it directly in your local environment or secret manager. Never commit `.env`. Choose your parent password in the app on first launch. It is stored in PostgreSQL as a salted scrypt hash, never plaintext. You can change it in Parent area; changing it locks other parent sessions. There is no default password. Parent sessions expire after 30 minutes, use HttpOnly/SameSite cookies, and are locked when learning begins. Parent writes check the gate on the server and enforce same-origin requests. The gate uses a basic single-process attempt limit.
+Generate the session secret with a secure random tool and save it directly in your environment or secret manager. Never commit `.env`. `PARENT_SESSION_SECRET` is a server signing secret, not a user's password.
 
-This MVP uses one household and one seeded child (`demo-child`). The parent password is a child-mode gate, not a multi-user authentication system. Do not expose private photos/profile APIs on the public Internet without adding full household authentication, tenant authorization, production rate limiting, upload limits at the reverse proxy, and privacy/deletion controls. The data model supports additional users/children; the UI intentionally focuses on one child.
+## Accounts, age, and saved progress
+
+Signup asks for the parent's name, email, password, the child's age in years/months, optional child name, and primary language. No verification email or paid service is required. Each account starts with its own child profile and vocabulary; families mark familiar words themselves. The same account password opens the parent gate. Signup opens the parent area initially; starting learning locks it. Settings allow changing age, password, and signing out.
+
+Passwords use independently salted scrypt hashes. Account cookies contain random opaque tokens; only token hashes are stored in `AccountSession`. Cookies are HttpOnly, SameSite=Strict, Secure in production, and expire after 30 days. The separate parent gate expires after 30 minutes and is bound to the user, account session, and password version. Signout revokes that account session. Password changes revoke other devices and invalidate older parent gates. Writes enforce same-origin requests. Failed login and parent-password attempts have a basic single-process rate limit.
+
+Profiles, vocabulary, custom cards, photos, learning sessions, and mission progress are scoped to the signed-in account on the server. API responses and photos are private and uncached. Shared curated cards are readable by all signed-in families; only trusted `ADMIN` accounts can edit the shared library. Ordinary parents can edit their own My World cards. Public signup cannot grant administrator privileges. A deployment administrator can assign an existing user's `User.role` to `ADMIN` using a trusted database connection.
+
+The child age is saved as an `ageMonths` snapshot plus `ageRecordedAt`; no birthday is inferred or required. An age helper advances that snapshot by elapsed calendar months for future personalization. Current card selection uses parent vocabulary and phrase levels, **not age-based recommendations yet**. The UI currently manages one child per account; database relations allow additional children later.
+
+Every first card exposure is saved once, alongside completion, vocabulary comfort, profile settings, and confirmed mission progress. Leaving a regular session midway exposes **Continue our cards** on Home after signing back in; missions resume from the mission path. Resuming is a deliberate choice and never auto-starts another session. Settings show a small saved-progress summary for the parent.
 
 ## Learning and personalization
 
-The demo child knows `car`, `truck`, `police-car`, `excavator`, `red`, `blue`, `green`, and `yellow`. Five additional concepts start as Learning to demonstrate the mix.
+The legacy demo child knows `car`, `truck`, `police-car`, `excavator`, `red`, `blue`, `green`, and `yellow`. Five additional concepts start as Learning to demonstrate the mix.
 
 `SessionGenerator` in `lib/session/generator.ts` accepts concepts, vocabulary, language, an optional category, a finite length (5, 8, 10, or 12), and a reproducible random seed. The API loads the requested child's vocabulary. It targets **50% known / 30% learning / 20% new**, fills shortages with known concepts first, avoids duplicates, filters inactive cards, and mixes categories where possible. A small category ends when its available unique cards run out.
 
@@ -75,24 +86,26 @@ In **Parent area → Phrase level**, choose automatic familiar-word expansion (t
 
 Mission progress is stored in PostgreSQL for each child and language. The first mission is available immediately; each later mission needs the earlier missions confirmed. Starting practice requires the parent gate; learning locks it again. After completing all mission cards, leave the screen and explore the activity. Back on the mission path, a parent presses **We explored it together** and opens the gate to confirm. Only that confirmation unlocks the next mission. Skipping a pause, completing a session, or exposure counts alone cannot advance the track. Replay completed missions freely, resume an unfinished practice at its next card, and stop after any session. No pronunciation grading, points, streaks, or automatic next session are added.
 
-## First-run password setup and upgrading
+## Upgrading an existing household
 
-After configuring the database, apply migrations and seed, then open the app privately to set and confirm an 8–128 character parent password. The singleton credential prevents two simultaneous setup requests from overwriting each other. The first person who can access an unclaimed household installation can perform setup, so complete it before making the installation publicly accessible. `PARENT_SESSION_SECRET` is still a server signing secret, not the parent's password; Render generates it automatically.
+Apply the committed migration, repeat the seed, and move old local photos with `npm run photos:migrate` before starting development. Hosted `deploy:start` performs the photo migration automatically when legacy files are present in the source checkout. Existing profiles, vocabulary, phrase comfort, custom cards, and sessions are preserved; migration never silently assigns them to the next signup.
 
-Existing installations that have `PARENT_PIN` set require that old PIN once during first-run password setup. After setup, only the new password works; remove `PARENT_PIN` from hosting variables. The credential and mission progress survive redeploys and repeated seeds. Existing vocabulary and phrase comfort are preserved. Old PIN-era parent cookies are invalidated on upgrade.
+If the old household has a password or `PARENT_PIN`, the signup screen offers **Link existing household**. Enter the old credential plus the new account information and child age. Only a successful old-password/PIN check can claim the legacy records. This atomic, one-time operation attaches them to an account and retains administrator access to the shared content library. New signups always get separate empty family records. After linking, remove the obsolete `PARENT_PIN`; it is consulted only for this legacy upgrade, never for new accounts.
 
-There is no email password recovery. For an owner-managed recovery, use a trusted PostgreSQL administration connection to delete only the `ParentCredential` row with id `household`, lock down access to the app, remove or retain a known legacy PIN as appropriate, and complete first-run setup again. This invalidates parent access until reconfigured and must only be done by the household's administrator; it does not reset vocabulary or missions.
+There is no email verification or self-service password recovery. This intentionally simple signup does not prove email ownership. Any recovery must use a trusted deployment administrator and a verified owner identity; do not delete credentials or let the next visitor claim records. Account deletion/export, verified recovery, and distributed rate limiting are future additions.
 
 ## Content and translations
 
-The seed includes **73 concepts across nine categories**, prioritizing vehicles, actions, colors/descriptions, and familiar home objects. The Prisma schema includes User, ChildProfile, Category, Concept, ConceptTranslation, ChildVocabulary, LearningSession, and SessionCard. The initial SQL migration is committed in `prisma/migrations`.
+The seed includes **145 concepts across nine categories**, with at least ten cards in every category, prioritizing vehicles, actions, colors/descriptions, and familiar home objects. The Prisma schema includes User, AccountSession, PhotoAsset, ChildProfile, Category, Concept, ConceptTranslation, ChildVocabulary, LearningSession, and SessionCard. The initial SQL migration is committed in `prisma/migrations`.
 
 - `lib/content/catalogue.ts`: authored English and German phrase levels and category metadata.
+- `lib/content/additional.ts`: 72 additional English/German cards across all nine categories, with all four authored stages.
+- `lib/content/additional-burmese.ts`: corresponding Burmese draft stages, separately reviewable.
 - `lib/content/burmese.ts`: **separate Burmese editorial drafts/placeholders**, deliberately easy to review. Many entries include four draft levels; some have word-only placeholders repeated across levels. All Burmese seed translations carry `needsReview=true`. Review with a native-speaking educator and replace incomplete levels before relying on Burmese progression. No native-speaker certification is claimed.
 - `lib/content/missions.ts`: curated real-world prompts and basic child-facing controls for all three languages.
 - `types/index.ts`: UI/domain types, separate from the database client.
 
-Parents can create/edit concepts in **Parent area → Content library**, assign a category/type/difficulty, set a local image path, enter each language's four phrase levels, add audio paths, review language, and pause or activate content. Existing parent edits are not replaced when seeding again. Edit database content in the UI; source seed edits affect new databases/new concepts only. A reviewed flag is editorial metadata; drafts remain available for parents to evaluate in this MVP.
+Trusted administrators can create/edit shared concepts in **Parent area → Content library**, assign a category/type/difficulty, set a local image path, enter each language's four phrase levels, add audio paths, review language, and pause or activate content. Existing parent edits are not replaced when seeding again. Edit database content in the UI; source seed edits affect new databases/new concepts only. A reviewed flag is editorial metadata; drafts remain available for parents to evaluate in this MVP.
 
 For source additions, add a category if needed, add a row with complete English/German authored phrases, add the Burmese entry separately, and place the image at its documented path. Use natural equivalents rather than word-for-word translation. Use `npm run db:seed` to insert the new concept. Category IDs in the seed deliberately equal their slugs.
 
@@ -100,9 +113,9 @@ For source additions, add a category if needed, add a row with complete English/
 
 Seed paths use `/images/<category>/<slug>.svg`. Place files in `public/images`; `/images/vehicles/truck.svg` maps to `public/images/vehicles/truck.svg`. The repository provides local illustration placeholders: custom vector vehicles and emoji-based familiar-object placeholders. They require no third-party image URL. Replace them with clear, licensed real-world photographs for production. Emoji appearance can vary with the device's fonts. The generic fallback prevents broken-image displays.
 
-**My world** lets parents upload JPG/PNG/WebP photos (up to 5 MB), enter curated phrases for English, Burmese, and German, choose a category, and save personalized concepts. The new card belongs to the child and is eligible for sessions. Mark it Knows in My words to prioritize expansion. Give it a unique identifier such as `my-blue-truck`.
+**My world** lets parents upload JPG/PNG/WebP photos (up to 5 MB), enter curated phrases for English, Burmese, and German, choose a category, and save personalized concepts. The new card belongs to the child and is eligible for sessions. Mark it Knows in My words to prioritize expansion. Give it a readable identifier such as `my-blue-truck`; it is namespaced per child so different families can use the same label.
 
-`lib/storage/index.ts` defines the `PhotoStorage` interface. The local adapter stores UUID-named files in `UPLOAD_DIR` (or ignored `public/uploads/` during local development) and serves validated filenames through `/api/photos/...`. Uploads require the parent gate and validate file signatures. Back up uploads and the database together. Restarting a deployment with an ephemeral filesystem loses uploaded photos; use the configured persistent disk/volume described in [deployment instructions](docs/deployment.md), or implement an S3-compatible adapter before horizontal scaling. Image cleanup after unused uploads and private signed delivery are future work. Photo metadata stripping is not implemented.
+`lib/storage/index.ts` defines the `PhotoStorage` interface. The local adapter stores UUID-named files in `UPLOAD_DIR` (or ignored private `var/uploads/` during local development) and serves validated filenames through `/api/photos/...`. Uploads require the signed-in parent gate and validate file signatures. `PhotoAsset` records ownership, and photo reads require that same family's account. Direct `/uploads/...` access is blocked, including legacy public uploads. Back up uploads and the database together. Restarting a deployment with an ephemeral filesystem loses uploaded photos; use the configured persistent disk/volume described in [deployment instructions](docs/deployment.md), or implement an S3-compatible adapter before horizontal scaling. Unused-photo cleanup and object-storage signed delivery are future work. Photo metadata stripping is not implemented.
 
 ## Audio
 
@@ -121,12 +134,13 @@ The app includes responsive phone/tablet layouts, large child controls, labeled 
 ```text
 app/                 App Router pages, APIs, global styling
 components/child/    finite session, audio controls, missions
-components/parent/   gate, vocabulary, settings, content/photo editor
+components/parent/   signup/login, gate, vocabulary, settings, content/photo editor
 lib/session/         deterministic domain selection and phrase levels
 lib/audio/           recording-first audio service
 lib/content/         centralized curated content and editorial drafts
 lib/db/              Prisma, demo fixtures, safe API errors
-lib/storage/         swappable local photo storage
+lib/security/        account sessions, password hashes, age snapshots
+lib/storage/         private local photo storage and legacy migration
 prisma/              schema, migration, idempotent seed
 public/              local artwork, icons, manifest, offline shell
  tests/              session generation tests
@@ -151,6 +165,6 @@ npm run build
 npm start
 ```
 
-Tests cover selection ratios, language availability, finite length, deterministic output, parent-controlled levels, mission unlocking per language, salted password hashing, runtime configuration, proxy origins, and external photo storage. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. Run `npm run build` then `npm run test:integration` with a PostgreSQL role that can create schemas to exercise the full production API flow: atomic first-run setup, PIN upgrade, password changes, server-enforced levels and mission progression, idempotent exposure writes, resume, and restart/seed persistence. The integration check creates a random isolated schema and removes only that schema afterwards; it does not reset your household data. It starts a temporary production server on port 3120 (`INTEGRATION_PORT` can override it).
+Tests cover selection ratios, language availability, finite length, deterministic output, parent-controlled levels, mission unlocking per language, salted password hashing, runtime configuration, proxy origins, and external photo storage. The cloud setup additionally exercised migrations and repeatable seeds against real PostgreSQL, production startup, and browser/API flows. Run `npm run build` then `npm run test:integration` with a PostgreSQL role that can create schemas to exercise the full production API flow: signup/login, cross-account isolation, password-authorized legacy adoption, password changes, server-enforced levels and mission progression, idempotent exposure writes, resume, and restart/seed persistence. The integration check creates a random isolated schema and removes only that schema afterwards; it does not reset your household data. It starts a temporary production server on port 3120 (`INTEGRATION_PORT` can override it).
 
-Current boundaries: single household/child, illustrative seed images, Burmese editorial review, no bundled recordings, basic offline shell only, local upload storage, and no parent-account authentication. Suggested next steps are native-language review, clear object photos and recorded audio, more curated descriptor combinations, an S3 adapter, household authentication/data deletion, and deliberately finite offline sessions. Keep parent-child interaction central as the app grows.
+Current boundaries: one child in each account's UI, no verification/reset email, basic in-process rate limiting, illustrative seed images, Burmese editorial review, no bundled recordings, basic offline shell only, and local upload storage. Suggested next steps are age-aware curation, verified recovery and account deletion/export, native-language review, clear object photos and recorded audio, more curated descriptor combinations, an S3 adapter, and deliberately finite offline sessions. Keep parent-child interaction central as the app grows.

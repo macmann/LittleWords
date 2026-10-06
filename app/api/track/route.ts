@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { apiError, requireDatabase } from "@/lib/db/http";
+import { accountContext } from "@/lib/security/account";
 import { protectParent } from "@/lib/parent-auth";
 import { missionTrack, missionUnlocked } from "@/lib/content/track";
 const schema = z.object({
@@ -10,6 +11,8 @@ const schema = z.object({
   offlineDone: z.literal(true),
 });
 export async function PATCH(req: NextRequest) {
+  const context = await accountContext(true);
+  if (context.response) return context.response;
   const denied = (await protectParent()) ?? requireDatabase();
   if (denied) return denied;
   try {
@@ -22,7 +25,7 @@ export async function PATCH(req: NextRequest) {
       );
     return await db.$transaction(async (tx) => {
       const all = await tx.missionProgress.findMany({
-        where: { childId: "demo-child" },
+        where: { childId: context.account.child.id },
         include: { session: { include: { cards: true } } },
       });
       const progress = all.find(

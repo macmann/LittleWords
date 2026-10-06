@@ -8,6 +8,7 @@
     "start": "next start --hostname 0.0.0.0",
     "test": "tsx --test tests/*.test.ts",
     "test:integration": "node tests/integration/flows.mjs",
+    "photos:migrate": "node scripts/migrate-photos.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "deploy:prepare": "node scripts/deploy.mjs --prepare-only",

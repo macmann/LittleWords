@@ -1,8 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { hasDatabase } from "@/lib/db/http";
+import { currentAccount } from "@/lib/security/account";
 import { sameOrigin } from "@/lib/http/origin";
 const devSecret = randomBytes(32).toString("hex");
 function secret() {
@@ -16,37 +15,38 @@ function secret() {
 function signature(value: string) {
   return createHmac("sha256", secret()).update(value).digest("hex");
 }
-/** Sign only the credential version whose password was verified. */
-export function parentToken(sessionVersion: string) {
+export function parentToken(account: {
+  user: { id: string; sessionVersion: string };
+  session: { id: string };
+}) {
   const expiry = String(Date.now() + 30 * 60 * 1000);
-  return `${expiry}.${signature(`${expiry}.${sessionVersion}`)}`;
+  return `${expiry}.${signature(`${expiry}.${account.user.id}.${account.session.id}.${account.user.sessionVersion}`)}`;
 }
-/** Authorize a one-time upgrade only; never use the old PIN after setup. */
 export function legacyPinMatches(pin: string) {
   const a = Buffer.from(pin),
     b = Buffer.from(process.env.PARENT_PIN || "");
   return b.length > 0 && a.length === b.length && timingSafeEqual(a, b);
 }
 export async function parentAuthorized() {
-  if (!hasDatabase()) return false;
+  const account = await currentAccount();
+  if (!account) return false;
   const value = (await cookies()).get("lw-parent")?.value;
   if (!value) return false;
   const [expiry, sig, extra] = value.split(".");
   if (
     extra ||
     !/^\d+$/.test(expiry) ||
-    !sig ||
-    !/^[a-f0-9]{64}$/.test(sig) ||
+    !/^[a-f0-9]{64}$/.test(sig || "") ||
     Number(expiry) < Date.now()
   )
     return false;
-  const credential = await db.parentCredential.findUnique({
-    where: { id: "household" },
-  });
-  if (!credential) return false;
   return timingSafeEqual(
     Buffer.from(sig),
-    Buffer.from(signature(`${expiry}.${credential.sessionVersion}`)),
+    Buffer.from(
+      signature(
+        `${expiry}.${account.user.id}.${account.session.id}.${account.user.sessionVersion}`,
+      ),
+    ),
   );
 }
 export async function protectParent() {
