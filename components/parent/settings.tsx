@@ -165,6 +165,36 @@ export function Settings({
               </label>
             ))}
           </fieldset>
+          <fieldset>
+            <legend>Playful adventures</legend>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={profile.aiPlanningEnabled}
+                disabled={!data.ai.configured && !profile.aiPlanningEnabled}
+                onChange={(e) =>
+                  setProfile({
+                    ...profile,
+                    aiPlanningEnabled: e.target.checked,
+                  })
+                }
+              />
+              Allow AI to plan activity layouts
+            </label>
+            <p className="field-help">
+              {data.ai.configured
+                ? `Provider: ${data.ai.provider === "openai" ? "OpenAI" : "DeepSeek"}. Planning may use paid API credits.`
+                : "AI is not configured on this server. Adventures use curated plans."}{" "}
+              Opt-in is optional. Only approved concept labels, language,
+              stages, and familiarity flags are sent. Names, age, photos,
+              recordings, and private cards stay out of provider requests.
+            </p>
+            <p className="field-help">
+              AI chooses tested activity types and themes. Phrases stay curated;
+              it cannot advance your child’s level. If planning fails, a curated
+              adventure takes over.
+            </p>
+          </fieldset>
           <label>
             Phrase level
             <select

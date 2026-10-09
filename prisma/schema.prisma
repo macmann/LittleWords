@@ -46,22 +46,23 @@ model User {
 }
 
 model ChildProfile {
-  id               String            @id @default(cuid())
-  userId           String
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name             String
-  birthDate        DateTime?
-  ageMonths        Int?
-  ageRecordedAt    DateTime?
-  primaryLanguage  Language          @default(EN)
-  enabledLanguages Language[]        @default([EN, MY, DE])
-  cardsPerSession  Int               @default(10)
-  practiceLevel    Int               @default(0)
-  createdAt        DateTime          @default(now())
-  vocabulary       ChildVocabulary[]
-  sessions         LearningSession[]
-  customConcepts   Concept[]
-  missionProgress  MissionProgress[]
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name              String
+  birthDate         DateTime?
+  ageMonths         Int?
+  ageRecordedAt     DateTime?
+  primaryLanguage   Language          @default(EN)
+  enabledLanguages  Language[]        @default([EN, MY, DE])
+  cardsPerSession   Int               @default(10)
+  practiceLevel     Int               @default(0)
+  aiPlanningEnabled Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  vocabulary        ChildVocabulary[]
+  sessions          LearningSession[]
+  customConcepts    Concept[]
+  missionProgress   MissionProgress[]
 }
 
 model Category {
@@ -133,6 +134,7 @@ model LearningSession {
   category        Category?        @relation(fields: [categoryId], references: [id])
   startedAt       DateTime         @default(now())
   completedAt     DateTime?
+  adventurePlan   Json?
   missionId       String?
   missionProgress MissionProgress?
   cards           SessionCard[]

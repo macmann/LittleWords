@@ -2875,3 +2875,149 @@ textarea {
     flex-shrink: 0;
   }
 }
+.adventure-activity {
+  padding: 20px;
+  background: var(--mint);
+  border-radius: 22px;
+  margin-bottom: 20px;
+}
+.adventure-activity h2 {
+  font-size: clamp(20px, 4vw, 28px);
+  margin: 0 0 15px;
+}
+.picture-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 18px 0;
+}
+.picture-choices button {
+  min-width: 0;
+  min-height: 140px;
+  background: #fff;
+  border: 3px solid transparent;
+  border-radius: 20px;
+}
+.picture-choices .picture-selected {
+  border-color: var(--green);
+}
+.picture-choices img {
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+}
+.interactive-scene {
+  position: relative;
+  overflow: hidden;
+  min-height: 260px;
+  border-radius: 20px;
+  background: #e1edf0;
+}
+.theme-cozy .interactive-scene {
+  background: #f5e7d1;
+}
+.theme-garden .interactive-scene {
+  background: #deeddd;
+}
+.scene-ground {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: #b7cb9d;
+}
+.theme-road .scene-ground {
+  background: #7b9586;
+}
+.theme-cozy .scene-ground {
+  background: #ddbc91;
+}
+.scene-cloud {
+  position: absolute;
+  top: 24px;
+  left: 25px;
+  width: 85px;
+  height: 30px;
+  background: #fff9;
+  border-radius: 60px;
+}
+.scene-object {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 85%;
+  margin: 25px auto 0;
+  transition: transform 0.45s ease;
+}
+.scene-object img {
+  width: 100%;
+  height: 165px;
+  object-fit: contain;
+}
+.scene-explored {
+  transform: translateX(12px) scale(1.03);
+}
+.scene-phrase {
+  position: relative;
+  z-index: 2;
+  font-size: 22px;
+  margin: 12px;
+  overflow-wrap: anywhere;
+}
+.together-picture {
+  width: 100%;
+  min-height: 140px;
+}
+.together-picture img {
+  width: 100%;
+  height: 170px;
+  object-fit: contain;
+}
+.together-phrase {
+  font-size: 26px;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+}
+.activity-notice {
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+}
+.adventure-start-note {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--green);
+}
+@media (max-width: 600px) {
+  .adventure-activity {
+    padding: 15px 12px;
+  }
+  .picture-choices {
+    gap: 10px;
+  }
+  .picture-choices img {
+    height: 120px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-object {
+    transition: none;
+  }
+}
+
+/* Long activity cards scroll beneath reachable navigation. */
+.adventure-learning {
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+}
+.adventure-learning .session-footer {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: calc(100% - 34px);
+  max-width: 816px;
+  z-index: 10;
+  margin: 0;
+  box-shadow: 0 -8px 18px var(--paper);
+}

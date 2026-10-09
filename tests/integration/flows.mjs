@@ -30,6 +30,9 @@ const environment = {
   PORT: port,
   APP_ORIGIN: base,
   PARENT_PIN: "",
+  AI_PROVIDER: "none",
+  OPENAI_API_KEY: "",
+  DEEPSEEK_API_KEY: "",
   PARENT_SESSION_SECRET: randomBytes(32).toString("hex"),
 };
 let server,
@@ -530,6 +533,73 @@ try {
   assert.equal(dataA.missionProgress.filter((p) => p.completedAt).length, 12);
   console.log(
     "All 12 mission stages, private photos, age, vocabulary and progress survive reseeding, restart, logout and login; password changes revoke other devices.",
+  );
+  await expect("/api/adventures", "POST", { language: "EN" }, undefined, 401);
+  await expect(
+    "/api/adventures",
+    "POST",
+    { language: "EN" },
+    cookieA
+      .split("; ")
+      .filter((v) => !v.startsWith("lw-parent="))
+      .join("; "),
+    401,
+  );
+  assert.equal(dataA.profile.aiPlanningEnabled, false);
+  const adventure = await (
+    await expect("/api/adventures", "POST", { language: "EN" }, cookieA)
+  ).json();
+  assert.equal(adventure.adventurePlan.source, "curated");
+  assert.equal(adventure.adventurePlan.fallbackReason, "disabled");
+  assert.equal(
+    new Set(adventure.adventurePlan.activities.map((a) => a.kind)).size,
+    3,
+  );
+  assert.ok(adventure.cards.length <= dataA.profile.cardsPerSession);
+  await expect(
+    "/api/sessions",
+    "PATCH",
+    { sessionId: adventure.id, complete: true },
+    cookieA,
+    409,
+  );
+  await expect(
+    "/api/sessions",
+    "PATCH",
+    { sessionId: adventure.id, sequence: 0 },
+    cookieB,
+    404,
+  );
+  const resumedAdventure = await (
+    await expect("/api/bootstrap", "GET", undefined, cookieA)
+  ).json();
+  assert.deepEqual(
+    resumedAdventure.resumeSession.adventurePlan,
+    adventure.adventurePlan,
+  );
+  await exercise(adventure, cookieA);
+  await expect(
+    "/api/profile",
+    "PATCH",
+    { ...dataA.profile, aiPlanningEnabled: true },
+    cookieA,
+  );
+  const fallbackAdventure = await (
+    await expect("/api/adventures", "POST", { language: "EN" }, cookieA)
+  ).json();
+  assert.equal(
+    fallbackAdventure.adventurePlan.fallbackReason,
+    "not_configured",
+  );
+  await exercise(fallbackAdventure, cookieA);
+  await expect(
+    "/api/profile",
+    "PATCH",
+    { ...dataA.profile, aiPlanningEnabled: false },
+    cookieA,
+  );
+  console.log(
+    "Adventures preserve finite stages and account ownership; consent defaults off, fallback works, snapshots resume, and completion requires every card.",
   );
   // Only the old household's password can attach its records; new signups cannot claim them.
   await db.parentCredential.create({

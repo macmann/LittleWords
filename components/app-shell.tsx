@@ -156,6 +156,38 @@ export function AppShell() {
       }
     });
   }
+  async function startAdventure() {
+    if (!online) {
+      setError("Connect again to plan an adventure and save progress.");
+      return;
+    }
+    if (starting || !data) return;
+    await withParent(async () => {
+      setStarting(true);
+      setError("");
+      audioService.stop();
+      try {
+        const response = await fetch("/api/adventures", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ language }),
+        });
+        const value = await response.json();
+        if (!response.ok) throw new Error(value.error);
+        setSession(value);
+        setParent(false);
+        await fetch("/api/gate", { method: "DELETE" });
+      } catch (e) {
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Could not plan this adventure. Please try again.",
+        );
+      } finally {
+        setStarting(false);
+      }
+    });
+  }
   async function startMission(missionId: string) {
     if (!online) {
       setError(
@@ -478,6 +510,32 @@ export function AppShell() {
                   </div>
                 </div>
               </section>
+              <button
+                className="home-track-banner"
+                disabled={starting}
+                onClick={() => void startAdventure()}
+              >
+                <span className="round-symbol">
+                  <Shapes size={27} />
+                </span>
+                <div>
+                  <h3>
+                    {starting
+                      ? "Planning our little adventure…"
+                      : "A playful adventure together"}
+                  </h3>
+                  <p>
+                    Picture choices, little scenes, and phrases to share.{" "}
+                    {data.profile.cardsPerSession} steps, including real-world
+                    pauses.
+                  </p>
+                  <span className="adventure-start-note">
+                    A grown-up starts this adventure. Curated activities always
+                    available.
+                  </span>
+                </div>
+                <ArrowRight size={21} />
+              </button>
               {data.resumeSession && (
                 <button
                   className="home-track-banner"

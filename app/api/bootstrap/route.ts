@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { aiConfiguration } from "@/lib/ai/provider";
+import { readPlan } from "@/lib/adventure/plan";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/db/http";
 import { accountContext, privateHeaders } from "@/lib/security/account";
@@ -44,7 +46,11 @@ export async function GET() {
         include: { cards: { orderBy: { sequence: "asc" } } },
       }),
     ]);
+    const adventurePlan = resume?.adventurePlan
+      ? readPlan(resume.adventurePlan, resume.cards, concepts)
+      : null;
     const usable =
+      (!resume?.adventurePlan || !!adventurePlan) &&
       resume?.cards.length &&
       profile.enabledLanguages.includes(resume.language) &&
       resume.cards.every((card) =>
@@ -57,12 +63,14 @@ export async function GET() {
         concepts,
         vocabulary,
         demo: false,
+        ai: aiConfiguration(),
         account: { name: user.name, email: user.email, role: user.role },
         security: { configured: true, legacyPinRequired: false },
         progressSummary: { sessionsCompleted: completed, cardsSeen },
         resumeSession: usable
           ? {
               id: resume.id,
+              adventurePlan,
               language: resume.language,
               cards: resume.cards.map(
                 ({ conceptId, levelShown, sequence }) => ({

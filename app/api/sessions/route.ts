@@ -218,13 +218,13 @@ export async function PATCH(req: NextRequest) {
             update: { seenCount: { increment: 1 }, lastSeen: new Date() },
           });
       }
-      if (input.complete && s.missionId) {
+      if (input.complete && (s.missionId || s.adventurePlan)) {
         const unseen = await tx.sessionCard.count({
           where: { sessionId: s.id, seenAt: null },
         });
         if (unseen)
           throw new IncompleteMission(
-            "Explore all the mission cards before completing.",
+            "Explore all the mission or adventure cards before completing.",
           );
       }
       if (input.complete)

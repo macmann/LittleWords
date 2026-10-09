@@ -13,6 +13,7 @@ import {
 import type { Bootstrap, Concept, Language, Session } from "@/types";
 import { audioService } from "@/lib/audio/service";
 import { familiarExpansion, knownConceptSlugs } from "@/lib/content/expansions";
+import { AdventureActivity } from "./adventure-activity";
 import { useCardSwipe } from "./use-card-swipe";
 import { levels } from "@/lib/content/levels";
 import { missionTrack } from "@/lib/content/track";
@@ -89,7 +90,10 @@ export function LearningSession({
       : undefined,
     copy = childCopy[language];
   const trackMission = missionTrack.find((m) => m.id === session.missionId);
-  const guide = !!trackMission || index % 3 === 2;
+  const activity = session.adventurePlan?.activities.find(
+    (a) => a.sequence === card?.sequence,
+  );
+  const guide = !!trackMission || !!activity || index % 3 === 2;
   // Cycle the authored mission types across sessions, without generating text.
   const missionOffset =
     [...session.id].reduce((sum, char) => sum + char.charCodeAt(0), 0) %
@@ -296,7 +300,7 @@ export function LearningSession({
     t.word;
   return (
     <section
-      className="learning"
+      className={`learning ${session.adventurePlan ? "adventure-learning" : ""}`}
       lang={language === "MY" ? "my" : language === "DE" ? "de" : "en"}
     >
       <header className="learning-header">
@@ -313,7 +317,9 @@ export function LearningSession({
         <LanguageControls
           language={language}
           enabled={
-            trackMission ? [session.language] : data.profile.enabledLanguages
+            trackMission || session.adventurePlan
+              ? [session.language]
+              : data.profile.enabledLanguages
           }
           onChange={changeLanguage}
         />
@@ -329,16 +335,42 @@ export function LearningSession({
           style={{ transform: `translateX(${swipe.offset}px)` }}
           {...swipe.handlers}
         >
-          <button
-            className="card-image"
-            onClick={() => void play(true)}
-            aria-label={`Listen to ${t.word}`}
-          >
-            <Photo concept={concept} />
-            <span className="tap-hint">
-              <Volume2 size={16} /> Tap to hear
-            </span>
-          </button>
+          {activity && session.adventurePlan ? (
+            <AdventureActivity
+              key={`${activity.sequence}-${language}`}
+              activity={activity}
+              theme={session.adventurePlan.theme}
+              concept={concept}
+              option={data.concepts.find((c) => c.id === activity.optionId)}
+              language={language}
+              phrase={phrase}
+              play={() => void play()}
+              playOption={(c) => {
+                const translation = c.translations.find(
+                  (t) => t.language === language,
+                );
+                if (translation)
+                  void audioService
+                    .playWord(translation, browserVoice)
+                    .catch((e) =>
+                      setAudioMessage(
+                        e instanceof Error ? e.message : copy.together,
+                      ),
+                    );
+              }}
+            />
+          ) : (
+            <button
+              className="card-image"
+              onClick={() => void play(true)}
+              aria-label={`Listen to ${t.word}`}
+            >
+              <Photo concept={concept} />
+              <span className="tap-hint">
+                <Volume2 size={16} /> Tap to hear
+              </span>
+            </button>
+          )}
           <h1>{t.word}</h1>
           <button className="listen-button" onClick={() => void play()}>
             <Volume2 size={24} />
@@ -360,22 +392,26 @@ export function LearningSession({
             </div>
           )}
           <p className="expanded-phrase">{phrase}</p>
-          <div className="say-together">
-            <Heart size={18} />
-            <p>
-              {turn ? copy.yourTurn : levels[card.levelShown - 1].cue[language]}
-            </p>
-            <button
-              className="secondary"
-              onClick={() => {
-                audioService.stop();
-                setTurn(!turn);
-                if (turn) void play();
-              }}
-            >
-              {turn ? copy.together : copy.giveTurn}
-            </button>
-          </div>
+          {!activity && (
+            <div className="say-together">
+              <Heart size={18} />
+              <p>
+                {turn
+                  ? copy.yourTurn
+                  : levels[card.levelShown - 1].cue[language]}
+              </p>
+              <button
+                className="secondary"
+                onClick={() => {
+                  audioService.stop();
+                  setTurn(!turn);
+                  if (turn) void play();
+                }}
+              >
+                {turn ? copy.together : copy.giveTurn}
+              </button>
+            </div>
+          )}
           {guide ? (
             <div className="parent-cue">
               <p>

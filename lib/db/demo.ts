@@ -8,6 +8,7 @@ import type { Bootstrap } from "@/types";
 export function demoData(): Bootstrap {
   return {
     demo: true,
+    ai: { provider: "none", configured: false },
     account: { name: "Demo Parent", email: null, role: "PARENT" },
     progressSummary: { sessionsCompleted: 0, cardsSeen: 0 },
     resumeSession: null,
@@ -22,6 +23,7 @@ export function demoData(): Bootstrap {
       enabledLanguages: ["EN", "MY", "DE"],
       cardsPerSession: 10,
       practiceLevel: 0,
+      aiPlanningEnabled: false,
       ageMonths: 36,
       ageRecordedAt: null,
     },
