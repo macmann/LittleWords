@@ -200,3 +200,7 @@ AI only arranges tested activity components and approved themes. It cannot gener
 Each launch makes at most one request, with an eight-second timeout, bounded responses and strict validation. Missing keys, outages, rejected layouts and rapid repeat launches use curated activities. The one-minute per-child request cooldown is per server process; distributed deployments should add a shared rate limiter and account quotas. Custom My World cards remain available in regular sessions and are excluded from AI adventures. Full account sessions require connectivity; the PWA caches the offline shell and public images, never private account responses.
 
 `npm test` covers both providers using mocked responses (no API key or paid calls needed), privacy boundaries, unsafe output and fallbacks. After `npm run build`, `npm run test:integration` checks account isolation, consent, adventure persistence and completion against a temporary PostgreSQL schema.
+
+### Illustration accuracy
+
+The [illustration review guide](docs/illustration-review.md) documents corrected art for 163 concepts, including every action and color/description, the reviewed picture-choice rules, and how to add accurate illustrations. Use the shared `ConceptImage` renderer in new UI; it applies reviewed artwork consistently and preserves parent photos and edited image URLs. Existing accounts receive these corrections without reseeding or losing progress. After deployment, close and reopen the PWA to activate the updated public-art cache.

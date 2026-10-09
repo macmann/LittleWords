@@ -1,4 +1,5 @@
 "use client";
+import { ConceptImage } from "@/components/concept-image";
 import { useState } from "react";
 import { Plus, Camera, Pencil, Check, X, Upload, Search } from "lucide-react";
 import type { Bootstrap, Concept, Translation, Language } from "@/types";
@@ -143,13 +144,7 @@ export function ContentEditor({
         {list.map((c) => (
           <article className="world-card" key={c.id}>
             <div>
-              <img
-                src={c.imageUrl}
-                alt=""
-                onError={(e) => {
-                  e.currentTarget.src = "/images/fallback.svg";
-                }}
-              />
+              <ConceptImage concept={c} loading="lazy" />
               {!c.active && <span className="inactive-badge">Paused</span>}
             </div>
             <h3>{c.translations.find((t) => t.language === "EN")?.word}</h3>
@@ -223,13 +218,7 @@ export function ContentEditor({
               }}
             >
               <div className="editor-image">
-                <img
-                  src={editing.imageUrl}
-                  alt="Card preview"
-                  onError={(e) => {
-                    e.currentTarget.src = "/images/fallback.svg";
-                  }}
-                />
+                <ConceptImage concept={editing} alt="Card preview" />
                 <label className="upload-label">
                   <Upload size={19} />
                   Upload photo

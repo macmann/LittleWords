@@ -861,7 +861,8 @@ details label {
   text-align: center;
   position: relative;
 }
-.word-item > img {
+.word-item > img,
+.word-item > .concept-illustration {
   width: 100%;
   height: 100px;
   margin: 5px 0 12px;
@@ -1058,7 +1059,8 @@ details label {
   border-radius: 12px;
   position: relative;
 }
-.world-card img {
+.world-card img,
+.world-card .concept-illustration {
   width: 100%;
   height: 160px;
 }
@@ -1121,7 +1123,8 @@ details label {
   border-radius: 14px;
   margin-bottom: 20px;
 }
-.editor-image img {
+.editor-image img,
+.editor-image .concept-illustration {
   width: 140px;
   height: 100px;
 }
@@ -1364,7 +1367,8 @@ details label {
   justify-content: center;
   overflow: hidden;
 }
-.card-image > img {
+.card-image > img,
+.card-image > .concept-illustration {
   height: 90%;
   width: 90%;
   object-fit: contain;
@@ -2115,7 +2119,8 @@ details label {
     grid-template-columns: repeat(2, 1fr);
     gap: 13px;
   }
-  .word-item > img {
+  .word-item > img,
+  .word-item > .concept-illustration {
     height: 105px;
   }
   .word-item h3 {
@@ -2144,7 +2149,8 @@ details label {
   .world-card {
     padding: 12px;
   }
-  .world-card img {
+  .world-card img,
+  .world-card .concept-illustration {
     height: 130px;
   }
   .world-card h3 {
@@ -2222,7 +2228,8 @@ details label {
     gap: 15px;
     padding: 12px;
   }
-  .editor-image img {
+  .editor-image img,
+  .editor-image .concept-illustration {
     width: 110px;
   }
   .upload-label {
@@ -2901,7 +2908,8 @@ textarea {
 .picture-choices .picture-selected {
   border-color: var(--green);
 }
-.picture-choices img {
+.picture-choices img,
+.picture-choices .concept-illustration {
   width: 100%;
   height: 150px;
   object-fit: contain;
@@ -2950,7 +2958,8 @@ textarea {
   margin: 25px auto 0;
   transition: transform 0.45s ease;
 }
-.scene-object img {
+.scene-object img,
+.scene-object .concept-illustration {
   width: 100%;
   height: 165px;
   object-fit: contain;
@@ -2969,7 +2978,8 @@ textarea {
   width: 100%;
   min-height: 140px;
 }
-.together-picture img {
+.together-picture img,
+.together-picture .concept-illustration {
   width: 100%;
   height: 170px;
   object-fit: contain;
@@ -2996,7 +3006,8 @@ textarea {
   .picture-choices {
     gap: 10px;
   }
-  .picture-choices img {
+  .picture-choices img,
+  .picture-choices .concept-illustration {
     height: 120px;
   }
 }
@@ -3020,4 +3031,22 @@ textarea {
   z-index: 10;
   margin: 0;
   box-shadow: 0 -8px 18px var(--paper);
+}
+
+.concept-illustration {
+  display: inline-block;
+  overflow: hidden;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.picture-target {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 12px 0;
+}
+.picture-label {
+  display: block;
+  font-size: 18px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
 }

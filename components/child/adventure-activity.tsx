@@ -1,4 +1,5 @@
 "use client";
+import { ConceptImage } from "@/components/concept-image";
 import { useState } from "react";
 import { Volume2, Heart } from "lucide-react";
 import type { Concept, Language } from "@/types";
@@ -30,17 +31,9 @@ export function AdventureActivity({
   const word =
     concept.translations.find((t) => t.language === language)?.word ?? "";
   function photo(c: Concept) {
-    return (
-      <img
-        src={c.imageUrl}
-        alt=""
-        draggable={false}
-        onError={(e) => {
-          e.currentTarget.src = "/images/fallback.svg";
-        }}
-      />
-    );
+    return <ConceptImage concept={c} />;
   }
+
   return (
     <section
       className={`adventure-activity theme-${theme}`}
@@ -59,6 +52,7 @@ export function AdventureActivity({
             <Volume2 size={20} />
             {copy.listen}
           </button>
+          <p className="picture-target">{word}</p>
           <div className="picture-choices">
             {(activity.sequence % 2
               ? [option, concept]
@@ -78,6 +72,9 @@ export function AdventureActivity({
                 }}
               >
                 {photo(c)}
+                <span className="picture-label">
+                  {c.translations.find((t) => t.language === language)?.word}
+                </span>
               </button>
             ))}
           </div>
