@@ -1,3 +1,4 @@
+import type { AdventurePlan } from "@/lib/adventure/plan";
 export type Language = "EN" | "MY" | "DE";
 export type Status = "KNOWN" | "LEARNING" | "NEW";
 export type Translation = {
@@ -45,6 +46,7 @@ export type Profile = {
   enabledLanguages: Language[];
   cardsPerSession: number;
   practiceLevel: number;
+  aiPlanningEnabled: boolean;
   ageMonths: number | null;
   ageRecordedAt: string | null;
 };
@@ -54,6 +56,7 @@ export type Bootstrap = {
   categories: Category[];
   vocabulary: Vocabulary[];
   demo: boolean;
+  ai: { provider: "none" | "openai" | "deepseek"; configured: boolean };
   account: { name: string; email: string | null; role: "PARENT" | "ADMIN" };
   progressSummary: { sessionsCompleted: number; cardsSeen: number };
   resumeSession: Session | null;
@@ -66,6 +69,7 @@ export type GeneratedCard = {
   sequence: number;
 };
 export type Session = {
+  adventurePlan?: AdventurePlan | null;
   resumeSequence?: number;
   missionId?: string | null;
   id: string;

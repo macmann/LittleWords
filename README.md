@@ -178,3 +178,25 @@ Current boundaries: one child in each account's UI, no verification/reset email,
 Deploy with `npm run deploy:start` to insert the 200 new concepts automatically. For local or manually started deployments, run `npm run db:seed` with the configured PostgreSQL database. No new schema migration is required for this pack. Repeated seeding preserves family vocabulary, existing curated edits, sessions, photos, and mission progress. New concepts become available in the existing finite sessions and categories; familiar-word expansion remains prioritized over the size of the new-word pool.
 
 On a free Render web service, `UPLOAD_DIR=/tmp/littlewords-uploads` can run a demo but photos are ephemeral and may disappear after restarting or redeploying. Durable photos require a paid disk or a storage adapter. Account/progress persistence depends on the configured PostgreSQL database's retention, not PWA installation. Installation requires HTTPS, with browser support varying across iOS and Android.
+
+### Optional AI adventures (OpenAI or DeepSeek)
+
+The home screen includes **A playful adventure together**. A parent starts a finite session with picture choices, simple interactive scenes, and say-it-together turns. Real-world pauses and parent-selected phrase levels still apply. Accounts save the chosen layout and card progress, so resuming does not call AI again. Curated adventures work without an API key.
+
+To enable AI planning, set server environment variables and restart:
+
+```env
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-server-key
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Or use `AI_PROVIDER=deepseek`, `DEEPSEEK_API_KEY`, and optionally `DEEPSEEK_MODEL=deepseek-chat`. Never use a `NEXT_PUBLIC_` prefix for API keys. On Render, add these in the service Environment settings; keep `npm run deploy:start` as the start command so migrations run. No extra storage or paid service is required for curated adventures.
+
+Then open **Parent area**, enable **Allow AI to plan activity layouts**, and save settings. Consent defaults off, including for existing accounts. Providers may charge for requests; configure a provider spending limit. A key being configured does not guarantee it is valid: safe server logs report provider HTTP status or invalid layouts without revealing keys or response bodies.
+
+AI only arranges tested activity components and approved themes. It cannot generate child-facing wording, HTML, JavaScript, images, translations, scores, or phrase levels. The local session generator prioritizes familiar vocabulary and decides stages. Requests contain at most 24 public concept options, labels in the session language, selected stages and familiarity flags. Names, email, ages, family photos, custom cards and recordings are excluded. Curated Burmese remains separately reviewable; this feature does not assess speech or promise developmental outcomes.
+
+Each launch makes at most one request, with an eight-second timeout, bounded responses and strict validation. Missing keys, outages, rejected layouts and rapid repeat launches use curated activities. The one-minute per-child request cooldown is per server process; distributed deployments should add a shared rate limiter and account quotas. Custom My World cards remain available in regular sessions and are excluded from AI adventures. Full account sessions require connectivity; the PWA caches the offline shell and public images, never private account responses.
+
+`npm test` covers both providers using mocked responses (no API key or paid calls needed), privacy boundaries, unsafe output and fallbacks. After `npm run build`, `npm run test:integration` checks account isolation, consent, adventure persistence and completion against a temporary PostgreSQL schema.

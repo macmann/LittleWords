@@ -18,8 +18,9 @@ export async function GET() {
     await db.accountSession.findFirst({ select: { id: true } });
     const profile = await db.childProfile.findUnique({
       where: { id: "demo-child" },
-      select: { id: true },
+      select: { id: true, aiPlanningEnabled: true },
     });
+    await db.learningSession.findFirst({ select: { adventurePlan: true } });
     if (!profile)
       return NextResponse.json(
         { status: "unavailable" },
