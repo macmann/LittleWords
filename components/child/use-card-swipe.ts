@@ -40,7 +40,9 @@ export function useCardSwipe({
         const target = e.target as HTMLElement;
         // Image taps can become swipes; other controls keep their normal behavior.
         if (
-          target.closest("button:not(.card-image), input, select, textarea, a")
+          target.closest(
+            "button:not(.card-image):not([data-swipe-surface]), input, select, textarea, a",
+          )
         )
           return;
         start.current = {

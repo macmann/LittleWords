@@ -66,6 +66,7 @@ export function AdventureActivity({
             ).map((c) => (
               <button
                 key={c.id}
+                data-swipe-surface
                 className={selected === c.id ? "picture-selected" : ""}
                 aria-pressed={selected === c.id}
                 aria-label={
@@ -91,6 +92,7 @@ export function AdventureActivity({
         <div className="interactive-scene">
           <span className="scene-cloud" aria-hidden="true" />
           <button
+            data-swipe-surface
             className={`scene-object ${explored ? "scene-explored" : ""}`}
             aria-label={`${copy.tap}: ${word}`}
             onClick={() => {
@@ -106,6 +108,7 @@ export function AdventureActivity({
       ) : (
         <>
           <button
+            data-swipe-surface
             className="together-picture"
             aria-label={`${copy.listen}: ${word}`}
             onClick={play}
