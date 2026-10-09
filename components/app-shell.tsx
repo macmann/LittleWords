@@ -28,6 +28,7 @@ import { ContentEditor } from "./parent/content-editor";
 import { Settings } from "./parent/settings";
 import { MissionTrack } from "./parent/mission-track";
 import { AccountScreen } from "./parent/account-screen";
+import { usePwa } from "./pwa/provider";
 import { audioService } from "@/lib/audio/service";
 type Page =
   "home" | "words" | "categories" | "world" | "parent" | "admin" | "track";
@@ -44,6 +45,7 @@ const nav: {
   { page: "world", label: "My world", icon: Camera, parent: true },
 ];
 export function AppShell() {
+  const { online } = usePwa();
   const [data, setData] = useState<Bootstrap | null>(null),
     [needsAuth, setNeedsAuth] = useState(false),
     [loadError, setLoadError] = useState(""),
@@ -88,7 +90,9 @@ export function AppShell() {
     void refresh();
     setBrowserVoice(localStorage.getItem("lw-device-voice") !== "off");
     if ("serviceWorker" in navigator)
-      void navigator.serviceWorker.register("/sw.js").catch(() => {});
+      void navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => {});
   }, [refresh]);
   useEffect(() => {
     if (data) setLanguage(data.profile.primaryLanguage);
@@ -153,10 +157,20 @@ export function AppShell() {
     });
   }
   async function startMission(missionId: string) {
+    if (!online) {
+      setError(
+        "Connect again before starting a mission so progress can be saved.",
+      );
+      return;
+    }
     if (starting) return;
     await withParent(() => start(undefined, missionId));
   }
   async function start(category?: string, missionId?: string) {
+    if (!online) {
+      setError("Connect again before starting cards so progress can be saved.");
+      return;
+    }
     if (!data || starting) return;
     setStarting(true);
     setError("");
@@ -208,6 +222,10 @@ export function AppShell() {
   }
   async function resume() {
     if (!data?.resumeSession) return;
+    if (!online) {
+      setError("Connect again to continue your saved cards.");
+      return;
+    }
     audioService.stop();
     setSession(data.resumeSession);
     setParent(false);
@@ -368,6 +386,12 @@ export function AppShell() {
           </div>
         </header>
         <main className="main-content">
+          {!online && (
+            <div className="notice connection-notice" role="status">
+              You’re offline. Reconnect to save progress and start cards, or
+              find something blue together.
+            </div>
+          )}
           {loadError && (
             <div className="notice" role="alert">
               {loadError}

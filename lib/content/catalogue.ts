@@ -1,4 +1,6 @@
 import type { Category, Concept, Translation } from "@/types";
+import { expansionRows } from "./expansion-pack";
+import { expansionBurmese } from "./expansion-pack-burmese";
 import { additionalRows } from "./additional";
 import { additionalBurmese } from "./additional-burmese";
 import { burmese } from "./burmese";
@@ -97,6 +99,10 @@ flower|outside|Flower/Red flower/Small red flower/I can see a flower.|Blume/Rote
 export const concepts: Concept[] = [
   ...rows.split("\n"),
   ...additionalRows.split("\n"),
+  ...expansionRows.split("\n").map((row) => {
+    const [slug, category, , en, de] = row.split("|");
+    return [slug, category, en, de].join("|");
+  }),
 ].map((row) => {
   const [slug, category, en, de] = row.split("|");
   const translate = (language: "EN" | "DE", value: string): Translation => {
@@ -110,7 +116,7 @@ export const concepts: Concept[] = [
       promptText: language === "EN" ? "What can you see?" : "Was siehst du?",
     };
   };
-  const my = burmese[slug] || additionalBurmese[slug];
+  const my = burmese[slug] || additionalBurmese[slug] || expansionBurmese[slug];
   return {
     id: slug,
     slug,
@@ -131,10 +137,23 @@ export const concepts: Concept[] = [
               "purple",
               "brown",
               "gray",
+              "orange-color",
             ].includes(slug)
             ? "COLOR"
             : "DESCRIPTION"
-          : category === "family"
+          : category === "family" &&
+              ![
+                "hand",
+                "foot",
+                "head",
+                "hair",
+                "eye",
+                "ear",
+                "nose",
+                "mouth",
+                "tummy",
+                "teeth",
+              ].includes(slug)
             ? "PERSON"
             : "OBJECT",
     difficulty: 1,

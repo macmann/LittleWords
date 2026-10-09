@@ -4,11 +4,13 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { concepts, categories } from "../lib/content/catalogue";
 import { currentAgeMonths } from "../lib/security/age";
+import { expansionBurmese } from "../lib/content/expansion-pack-burmese";
+import { expansionRows } from "../lib/content/expansion-pack";
 import { additionalBurmese } from "../lib/content/additional-burmese";
 
-test("the expanded catalogue has 145 unique cards, at least ten per category, and complete authored stages", async () => {
-  assert.equal(concepts.length, 145);
-  assert.equal(new Set(concepts.map((c) => c.slug)).size, 145);
+test("the expanded catalogue has 345 unique cards, at least ten per category, and complete authored stages", async () => {
+  assert.equal(concepts.length, 345);
+  assert.equal(new Set(concepts.map((c) => c.slug)).size, 345);
   for (const category of categories)
     assert.ok(
       concepts.filter((c) => c.categoryId === category.id).length >= 10,
@@ -22,6 +24,19 @@ test("the expanded catalogue has 145 unique cards, at least ten per category, an
     await access(path.join(process.cwd(), "public", c.imageUrl));
   }
   assert.equal(Object.keys(additionalBurmese).length, 72);
+  assert.equal(expansionRows.split("\n").length, 200);
+  assert.equal(Object.keys(expansionBurmese).length, 200);
+  for (const row of expansionRows.split("\n")) {
+    const slug = row.split("|")[0];
+    const concept = concepts.find((c) => c.slug === slug)!;
+    for (const t of concept.translations) {
+      assert.equal(
+        new Set([t.word, t.phraseLevel2, t.phraseLevel3, t.sentence]).size,
+        4,
+        `${slug}/${t.language}`,
+      );
+    }
+  }
 });
 
 test("age snapshots can support future content without inferring a birthday", () => {

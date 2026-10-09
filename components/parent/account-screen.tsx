@@ -163,6 +163,12 @@ export function AccountScreen({ onSignedIn }: { onSignedIn: () => void }) {
               onChange={(e) => change("password", e.target.value)}
             />
           </label>
+          {mode === "login" && (
+            <p className="field-help">
+              Use the password you chose at signup. It also opens the parent
+              area.
+            </p>
+          )}
           {mode !== "login" && (
             <>
               <p className="field-help">

@@ -1,1 +1,31 @@
-{"name":"LittleWords — Learn together","short_name":"LittleWords","description":"Short, parent-guided language moments","start_url":"/","scope":"/","display":"standalone","background_color":"#f9f8f3","theme_color":"#f9f8f3","icons":[{"src":"/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},{"src":"/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}
+{
+  "name": "LittleWords \u2014 Learn together",
+  "short_name": "LittleWords",
+  "description": "Short, parent-guided language moments",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9f8f3",
+  "theme_color": "#f9f8f3",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "/",
+  "lang": "en",
+  "categories": [
+    "education",
+    "kids"
+  ],
+  "prefer_related_applications": false
+}

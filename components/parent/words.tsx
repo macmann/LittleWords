@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Search, Check, Heart, SlidersHorizontal } from "lucide-react";
 import type { Bootstrap, Status, Concept } from "@/types";
 export function VocabularyManager({
@@ -9,7 +9,8 @@ export function VocabularyManager({
   data: Bootstrap;
   onRefresh: () => void;
 }) {
-  const [search, setSearch] = useState(""),
+  const [page, setPage] = useState(0),
+    [search, setSearch] = useState(""),
     [category, setCategory] = useState(""),
     [filter, setFilter] = useState(""),
     [error, setError] = useState(""),
@@ -22,9 +23,27 @@ export function VocabularyManager({
       (!category || c.categoryId === category) &&
       (!filter || (vocab.get(c.id)?.status || "NEW") === filter) &&
       c.translations.some((t) =>
-        t.word.toLowerCase().includes(search.toLowerCase()),
+        [t.word, t.phraseLevel2, t.phraseLevel3, t.sentence].some((value) =>
+          value.toLowerCase().includes(search.trim().toLowerCase()),
+        ),
       ),
   );
+  const listHeading = useRef<HTMLParagraphElement>(null);
+  const pageSize = 24;
+  const pages = Math.max(1, Math.ceil(concepts.length / pageSize));
+  const currentPage = Math.min(page, pages - 1);
+  const visible = concepts.slice(
+    currentPage * pageSize,
+    (currentPage + 1) * pageSize,
+  );
+  function changePage(next: number) {
+    setPage(next);
+    listHeading.current?.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+  const selectedTranslation =
+    selected?.translations.find(
+      (t) => t.language === data.profile.primaryLanguage,
+    ) ?? selected?.translations[0];
   async function update(
     conceptId: string,
     values: { status?: Status; comfortableLevel?: number; favorite?: boolean },
@@ -72,16 +91,22 @@ export function VocabularyManager({
         <label className="search-field">
           <Search size={20} />
           <input
-            placeholder="Search words…"
+            placeholder="Search words or phrases…"
             aria-label="Search words"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
           />
         </label>
         <select
           aria-label="Filter category"
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          onChange={(e) => {
+            setCategory(e.target.value);
+            setPage(0);
+          }}
         >
           <option value="">All categories</option>
           {data.categories.map((c) => (
@@ -93,7 +118,10 @@ export function VocabularyManager({
         <select
           aria-label="Filter vocabulary status"
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            setPage(0);
+          }}
         >
           <option value="">All words</option>
           <option value="KNOWN">Knows</option>
@@ -106,8 +134,13 @@ export function VocabularyManager({
           {error}
         </p>
       )}
+      <p className="word-results" ref={listHeading} role="status">
+        {concepts.length
+          ? `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, concepts.length)} of ${concepts.length} words`
+          : "0 words"}
+      </p>
       <div className="word-grid">
-        {concepts.map((c) => {
+        {visible.map((c) => {
           const v = vocab.get(c.id),
             t =
               c.translations.find(
@@ -126,6 +159,10 @@ export function VocabularyManager({
               <img
                 src={c.imageUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
+                width={200}
+                height={140}
                 onError={(e) => {
                   e.currentTarget.src = "/images/fallback.svg";
                 }}
@@ -154,6 +191,27 @@ export function VocabularyManager({
           );
         })}
       </div>
+      {pages > 1 && (
+        <nav className="word-pagination" aria-label="Word library pages">
+          <button
+            className="secondary"
+            disabled={currentPage === 0}
+            onClick={() => changePage(currentPage - 1)}
+          >
+            Previous words
+          </button>
+          <span>
+            Page {currentPage + 1} of {pages}
+          </span>
+          <button
+            className="secondary"
+            disabled={currentPage >= pages - 1}
+            onClick={() => changePage(currentPage + 1)}
+          >
+            Next words
+          </button>
+        </nav>
+      )}
       {!concepts.length && (
         <div className="empty-state">
           <Search size={32} />
@@ -169,7 +227,7 @@ export function VocabularyManager({
             aria-modal="true"
             aria-label="Phrase progression"
           >
-            <h2>{selected.translations[0].word}</h2>
+            <h2>{selectedTranslation!.word}</h2>
             <p>Advance only when this phrase feels comfortable together.</p>
             {[1, 2, 3].map((level) => (
               <button
@@ -183,9 +241,9 @@ export function VocabularyManager({
                 <span>
                   {
                     [
-                      selected.translations[0].word,
-                      selected.translations[0].phraseLevel2,
-                      selected.translations[0].phraseLevel3,
+                      selectedTranslation!.word,
+                      selectedTranslation!.phraseLevel2,
+                      selectedTranslation!.phraseLevel3,
                     ][level - 1]
                   }
                 </span>
