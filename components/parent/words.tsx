@@ -1,4 +1,5 @@
 "use client";
+import { ConceptImage } from "@/components/concept-image";
 import { useState, useRef } from "react";
 import { Search, Check, Heart, SlidersHorizontal } from "lucide-react";
 import type { Bootstrap, Status, Concept } from "@/types";
@@ -156,17 +157,7 @@ export function VocabularyManager({
               >
                 <Heart size={17} fill={v?.favorite ? "currentColor" : "none"} />
               </button>
-              <img
-                src={c.imageUrl}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                width={200}
-                height={140}
-                onError={(e) => {
-                  e.currentTarget.src = "/images/fallback.svg";
-                }}
-              />
+              <ConceptImage concept={c} loading="lazy" />
               <h3>{t.word}</h3>
               <div className="status-controls">
                 {(["KNOWN", "LEARNING", "NEW"] as const).map((status) => (

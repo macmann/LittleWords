@@ -1,5 +1,5 @@
 /* Only public illustrations and the offline activity are cached. Never accounts, API data, or family photos. */
-const CACHE = "littlewords-shell-v2";
+const CACHE = "littlewords-shell-v3";
 const SHELL = ["/offline.html", "/icon.svg", "/images/fallback.svg"];
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -53,6 +53,7 @@ self.addEventListener("fetch", (event) => {
   if (
     !url.search &&
     (/^\/images\/[a-z0-9/-]+\.svg$/.test(url.pathname) ||
+      /^\/images\/meaning\/[a-z-]+-v[0-9]+\.webp$/.test(url.pathname) ||
       url.pathname === "/icon.svg")
   ) {
     event.respondWith(publicImage(event.request));

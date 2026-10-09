@@ -1,4 +1,5 @@
 "use client";
+import { ConceptImage } from "@/components/concept-image";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -43,17 +44,9 @@ export function LanguageControls({
   );
 }
 function Photo({ concept }: { concept: Concept }) {
-  return (
-    <img
-      src={concept.imageUrl}
-      alt=""
-      draggable={false}
-      onError={(e) => {
-        e.currentTarget.src = "/images/fallback.svg";
-      }}
-    />
-  );
+  return <ConceptImage concept={concept} />;
 }
+
 export function LearningSession({
   data,
   session,

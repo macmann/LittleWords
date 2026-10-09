@@ -7,6 +7,7 @@ import { apiError } from "@/lib/db/http";
 import { sessionGenerator } from "@/lib/session/generator";
 import { planAdventure, aiConfiguration } from "@/lib/ai/provider";
 import { curatedPlan } from "@/lib/adventure/plan";
+import { preferredPictureSlugs } from "@/lib/adventure/picture-options";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const inputSchema = z
@@ -61,12 +62,14 @@ export async function POST(req: NextRequest) {
     const chosen = cards.map((card) =>
       concepts.find((c) => c.id === card.conceptId)!,
     );
-    const pool = [
-      ...chosen,
-      ...concepts
-        .filter((c) => !chosen.some((v) => v.id === c.id))
-        .slice(0, 24 - chosen.length),
-    ];
+    const preferred = new Set(chosen.flatMap(preferredPictureSlugs));
+    const additional = concepts.filter(
+      (c) => !chosen.some((v) => v.id === c.id),
+    );
+    additional.sort(
+      (a, b) => Number(preferred.has(b.slug)) - Number(preferred.has(a.slug)),
+    );
+    const pool = [...chosen, ...additional.slice(0, 24 - chosen.length)];
     const configuration = aiConfiguration(),
       willCall = profile.aiPlanningEnabled && configuration.configured;
     const cooldown = (calls.get(profile.id) ?? 0) > Date.now();

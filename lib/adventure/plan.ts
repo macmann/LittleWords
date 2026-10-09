@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pictureOptions } from "./picture-options";
 import type { Concept, GeneratedCard } from "@/types";
 export const activityKinds = [
   "PICTURE_CHOICE",
@@ -63,14 +64,21 @@ export function validateProposal(
       if (
         !activity.optionId ||
         activity.optionId === activity.conceptId ||
-        !approved.has(activity.optionId)
+        !approved.has(activity.optionId) ||
+        !pictureOptions(
+          pool.find((c) => c.id === activity.conceptId)!,
+          pool,
+        ).some((c) => c.id === activity.optionId)
       )
         throw new Error("Unapproved picture choice");
     } else if (activity.optionId) throw new Error("Unexpected picture choice");
   }
   if (
     cards.length >= 3 &&
-    approved.size >= 2 &&
+    cards.some((card) => {
+      const target = pool.find((c) => c.id === card.conceptId);
+      return !!target && pictureOptions(target, pool).length > 0;
+    }) &&
     new Set(sorted.map((a) => a.kind)).size !== 3
   )
     throw new Error("Activities need variety");
@@ -81,23 +89,25 @@ export function curatedPlan(
   pool: Concept[],
   seed = 0,
 ): AdventurePlan {
-  const options = pool.filter((c) => c.active && !c.childId);
-  const activities = cards
-    .map((card, i): Activity => {
-      const other = options.find((c) => c.id !== card.conceptId);
-      const kind = activityKinds[i % 3];
-      return {
-        ...card,
-        kind: kind === "PICTURE_CHOICE" && !other ? "SAY_TOGETHER" : kind,
-        ...(kind === "PICTURE_CHOICE" && other ? { optionId: other.id } : {}),
-      };
-    })
-    .map(({ conceptId, sequence, kind, optionId }) => ({
-      conceptId,
-      sequence,
-      kind,
-      ...(optionId ? { optionId } : {}),
-    }));
+  const choices = cards.map((card) => {
+    const target = pool.find((c) => c.id === card.conceptId);
+    return target ? pictureOptions(target, pool) : [];
+  });
+  const choiceIndex = choices.findIndex((options) => options.length > 0);
+  let modeled = 0;
+  const activities: Activity[] = cards.map((card, i) => ({
+    conceptId: card.conceptId,
+    sequence: card.sequence,
+    kind:
+      i === choiceIndex
+        ? "PICTURE_CHOICE"
+        : modeled++ % 2 === 0
+          ? "INTERACTIVE_SCENE"
+          : "SAY_TOGETHER",
+    ...(i === choiceIndex
+      ? { optionId: choices[i][Math.abs(seed) % choices[i].length].id }
+      : {}),
+  }));
   return {
     version: 1,
     source: "curated",
@@ -113,14 +123,38 @@ export function readPlan(
   if (!value) return null;
   try {
     const plan = storedSchema.parse(value);
-    return {
-      ...plan,
-      ...validateProposal(
-        { theme: plan.theme, activities: plan.activities },
-        cards,
-        concepts,
-      ),
-    };
+    try {
+      return {
+        ...plan,
+        ...validateProposal(
+          { theme: plan.theme, activities: plan.activities },
+          cards,
+          concepts,
+        ),
+      };
+    } catch {
+      // Repair old mismatched choices without losing the child's saved cards or stage.
+      const sorted = [...plan.activities].sort(
+        (a, b) => a.sequence - b.sequence,
+      );
+      if (
+        sorted.length !== cards.length ||
+        sorted.some(
+          (a, i) =>
+            a.sequence !== cards[i].sequence ||
+            a.conceptId !== cards[i].conceptId ||
+            !concepts.some(
+              (c) => c.active && !c.childId && c.id === a.conceptId,
+            ),
+        )
+      )
+        return null;
+      return {
+        ...curatedPlan(cards, concepts),
+        theme: plan.theme,
+        fallbackReason: "invalid_plan",
+      };
+    }
   } catch {
     return null;
   }
