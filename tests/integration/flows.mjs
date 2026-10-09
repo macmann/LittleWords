@@ -219,7 +219,7 @@ try {
   assert.equal(dataA.account.email, "parenta@example.test");
   assert.equal(dataB.account.role, "PARENT");
   assert.notEqual(dataA.profile.id, dataB.profile.id);
-  assert.equal(dataA.concepts.length, 145);
+  assert.equal(dataA.concepts.length, 345);
   assert.ok(
     !JSON.stringify(dataA).includes("passwordHash") &&
       !JSON.stringify(dataA).includes("tokenHash"),

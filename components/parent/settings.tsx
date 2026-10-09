@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Check, ShieldCheck, Volume2, Library, ArrowRight } from "lucide-react";
+import { InstallCard } from "@/components/pwa/provider";
 import { levels } from "@/lib/content/levels";
 import { ParentPasswordForm } from "./password-form";
 import type { Bootstrap, Language, Profile } from "@/types";
@@ -223,6 +224,7 @@ export function Settings({
           </button>
         </form>
         <div className="settings-aside">
+          <InstallCard />
           <article className="settings-card">
             <ShieldCheck size={26} />
             <h2>Your account</h2>

@@ -2709,3 +2709,169 @@ details label {
     padding: 24px 20px;
   }
 }
+
+/* Parent browsing stays finite even as the catalogue grows. */
+.word-results {
+  color: var(--green);
+  font-size: 14px;
+  margin: 20px 0 14px;
+  scroll-margin-top: 100px;
+}
+.word-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 26px 0;
+}
+.word-pagination > span {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.word-pagination button {
+  min-height: 48px;
+}
+.install-card .install-steps {
+  padding: 14px;
+  background: var(--mint);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.install-card .secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.connection-notice {
+  margin-bottom: 20px;
+}
+.account-card .password-form > label,
+.account-card .password-form > fieldset {
+  margin: 0;
+}
+.account-card .password-form label > input,
+.account-card .password-form label > select {
+  margin-top: 0;
+}
+.account-card .password-form legend {
+  margin-bottom: 8px;
+}
+.account-card .password-form {
+  gap: 16px;
+}
+@media (max-width: 760px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  } /* Avoid iOS focus zoom; pinch zoom remains enabled. */
+  .account-page {
+    padding-top: max(20px, env(safe-area-inset-top));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .account-intro h1 {
+    font-size: 27px;
+  }
+  .account-intro > p {
+    display: none;
+  }
+  .account-card {
+    padding: 20px 16px;
+  }
+  .account-card .password-form {
+    gap: 13px;
+    margin-top: 16px;
+  }
+  .account-card .field-help {
+    font-size: 12px;
+  }
+  .account-card .account-footer {
+    margin: 18px 0 0;
+  }
+  .account-tabs button {
+    min-height: 48px;
+  }
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+    height: calc(75px + env(safe-area-inset-top));
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+  .main-content {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .language-controls button {
+    min-height: 44px;
+    min-width: 36px;
+  }
+  .mobile-brand > .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .status-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .status-controls button {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+  .word-details {
+    min-height: 44px;
+  }
+  .favorite-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .word-item {
+    min-width: 0;
+  }
+  .word-item h3 {
+    overflow-wrap: anywhere;
+  }
+  .word-pagination {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .word-pagination > span {
+    grid-row: 1;
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+  .word-pagination button {
+    font-size: 13px;
+    padding: 12px 8px;
+  }
+  .filters .search-field {
+    min-width: 0;
+  }
+}
+.learning-card h1,
+.expanded-phrase {
+  overflow-wrap: anywhere;
+}
+/* Tablets can also focus forms in a touch browser. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+.search-field input,
+.filters > select {
+  font-size: 16px;
+}
+@media (max-width: 380px) {
+  .mobile-brand .brand-icon {
+    display: none;
+  }
+  .mobile-brand .brand {
+    font-size: 20px;
+  }
+  .topbar-right {
+    flex-shrink: 0;
+  }
+}

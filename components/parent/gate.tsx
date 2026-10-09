@@ -63,7 +63,7 @@ export function ParentGate({
             }
           }}
         >
-          <label htmlFor="parent-password">Parent password</label>
+          <label htmlFor="parent-password">Account password</label>
           <input
             ref={input}
             id="parent-password"
