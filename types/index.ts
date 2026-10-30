@@ -51,6 +51,12 @@ export type Profile = {
   ageRecordedAt: string | null;
 };
 export type Bootstrap = {
+  generativeUIEnabled?: boolean;
+  resumeGenerativeLesson?: {
+    lesson: import("@/lib/generative/domain").GenerativeLesson;
+    language: Language;
+    resumeIndex: number;
+  } | null;
   profile: Profile;
   concepts: Concept[];
   categories: Category[];

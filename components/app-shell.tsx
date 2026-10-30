@@ -1,5 +1,12 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { GenerativeSession } from "./generative/session";
+import {
+  generateLocalLesson,
+  lessonSchema,
+  type GenerativeLesson,
+} from "@/lib/generative/domain";
+import { pictureOptions } from "@/lib/adventure/picture-options";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -46,6 +53,12 @@ const nav: {
 ];
 export function AppShell() {
   const { online } = usePwa();
+  const localHistory = useRef<GenerativeLesson[]>([]);
+  const [generative, setGenerative] = useState<{
+    lesson: GenerativeLesson;
+    local: boolean;
+    initialIndex?: number;
+  } | null>(null);
   const [data, setData] = useState<Bootstrap | null>(null),
     [needsAuth, setNeedsAuth] = useState(false),
     [loadError, setLoadError] = useState(""),
@@ -156,7 +169,84 @@ export function AppShell() {
       }
     });
   }
+  async function startGenerative() {
+    if (!data || starting) return;
+    setStarting(true);
+    setError("");
+    try {
+      if (online) {
+        try {
+          const response = await fetch("/api/v1/lessons/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ language, schemaVersion: "1.0" }),
+          });
+          if (
+            response.status === 401 ||
+            response.status === 403 ||
+            response.status === 404
+          )
+            throw new Error(
+              "This adventure is unavailable. Please reconnect or ask a grown-up.",
+            );
+          if (response.ok) {
+            setGenerative({
+              lesson: lessonSchema.parse(await response.json()),
+              local: false,
+            });
+            return;
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("This adventure"))
+            throw e;
+        }
+      }
+      const pool = data.concepts.filter(
+        (c) =>
+          c.active &&
+          !c.childId &&
+          c.translations.some((t) => t.language === language),
+      );
+      const lesson = generateLocalLesson(
+        {
+          vocabulary: pool.map((c) => ({
+            wordId: c.id,
+            choiceIds: pictureOptions(c, pool).map((v) => v.id),
+          })),
+          mastery: {},
+          recentHistory: localHistory.current,
+          language,
+          primaryLanguage: data.profile.primaryLanguage,
+          learningLanguages: data.profile.enabledLanguages,
+          count: data.profile.cardsPerSession,
+        },
+        `local-${Date.now()}`,
+      );
+      localHistory.current = [lesson, ...localHistory.current].slice(0, 5);
+      setGenerative({ lesson, local: true });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setStarting(false);
+    }
+  }
   async function startAdventure() {
+    if (data?.generativeUIEnabled) {
+      if (online)
+        await withParent(async () => {
+          await startGenerative();
+          setParent(false);
+          await fetch("/api/gate", { method: "DELETE" });
+        });
+      else if (parent) {
+        await startGenerative();
+        setParent(false);
+      } else
+        setError(
+          "Ask a grown-up to open this adventure while connected. Offline cards are still available.",
+        );
+      return;
+    }
     if (!online) {
       setError("Connect again to plan an adventure and save progress.");
       return;
@@ -296,6 +386,22 @@ export function AppShell() {
           </>
         )}
       </main>
+    );
+  if (generative)
+    return (
+      <GenerativeSession
+        initialIndex={generative.initialIndex}
+        lesson={generative.lesson}
+        data={data}
+        language={language}
+        browserVoice={browserVoice}
+        local={generative.local}
+        onExit={() => {
+          audioService.stop();
+          setGenerative(null);
+          void refresh();
+        }}
+      />
     );
   if (session)
     return (
@@ -525,17 +631,43 @@ export function AppShell() {
                       : "A playful adventure together"}
                   </h3>
                   <p>
-                    Picture choices, little scenes, and phrases to share.{" "}
-                    {data.profile.cardsPerSession} steps, including real-world
-                    pauses.
+                    {data.generativeUIEnabled
+                      ? `Listen, find pictures, match words, and say them together. ${data.profile.cardsPerSession} little learning steps.`
+                      : `Picture choices, little scenes, and phrases to share. ${data.profile.cardsPerSession} steps, including real-world pauses.`}
                   </p>
                   <span className="adventure-start-note">
-                    A grown-up starts this adventure. Curated activities always
-                    available.
+                    {data.generativeUIEnabled
+                      ? "A different little learning adventure every time."
+                      : "A grown-up starts this adventure."}{" "}
+                    Curated activities always available.
                   </span>
                 </div>
                 <ArrowRight size={21} />
               </button>
+              {data.generativeUIEnabled && data.resumeGenerativeLesson && (
+                <button
+                  className="home-track-banner"
+                  onClick={() => {
+                    const saved = data.resumeGenerativeLesson!;
+                    audioService.stop();
+                    setLanguage(saved.language);
+                    setGenerative({
+                      lesson: saved.lesson,
+                      local: false,
+                      initialIndex: saved.resumeIndex,
+                    });
+                    setParent(false);
+                    void fetch("/api/gate", { method: "DELETE" });
+                  }}
+                >
+                  <BookOpen />
+                  <span>
+                    Continue our little adventure · step{" "}
+                    {data.resumeGenerativeLesson.resumeIndex + 1}
+                  </span>
+                  <ArrowRight />
+                </button>
+              )}
               {data.resumeSession && (
                 <button
                   className="home-track-banner"

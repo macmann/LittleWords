@@ -59,6 +59,7 @@ model ChildProfile {
   practiceLevel     Int               @default(0)
   aiPlanningEnabled Boolean           @default(false)
   createdAt         DateTime          @default(now())
+  generativeLessons GenerativeLessonRecord[]
   vocabulary        ChildVocabulary[]
   sessions          LearningSession[]
   customConcepts    Concept[]
@@ -195,4 +196,28 @@ model PhotoAsset {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model GenerativeLessonRecord {
+  id String @id
+  childId String
+  child ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  language Language
+  lesson Json
+  source String
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  results GenerativeActivityResult[]
+  @@index([childId, createdAt])
+}
+model GenerativeActivityResult {
+  id String @id
+  lessonId String
+  lesson GenerativeLessonRecord @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  wordId String
+  correct Boolean?
+  responseTime Int
+  selectedIds Json
+  createdAt DateTime @default(now())
+  @@index([lessonId])
 }

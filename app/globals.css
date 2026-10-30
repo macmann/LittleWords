@@ -3050,3 +3050,35 @@ textarea {
   margin-top: 8px;
   overflow-wrap: anywhere;
 }
+
+/* Controlled presentation tokens affect learning content only. */
+.generative-stage { --adventure-accent: #23744e; background: #f3faee; border: 3px solid var(--adventure-accent); border-radius: 28px; padding: clamp(16px, 4vw, 36px); margin: 20px auto; max-width: 780px; text-align: center; color: #192c25; }
+.generative-stage[data-theme="space"], .generative-stage[data-theme="ocean"] { --adventure-accent: #355f9b; }
+.generative-stage[data-theme="farm"], .generative-stage[data-theme="dinosaurs"] { --adventure-accent: #657c24; }
+.generative-stage[data-theme="vehicles"], .generative-stage[data-theme="city"] { --adventure-accent: #8c4921; }
+.generative-stage[data-theme="playground"] { --adventure-accent: #8a3875; }
+.generative-stage.palette-bright { background: #fff8dc; }
+.generative-stage.palette-warm { background: #fff0e5; }
+.generative-stage.palette-cool { background: #edf6ff; }
+.generative-stage.palette-pastel { background: #f4efff; }
+.generative-stage.palette-high-contrast { background: #fff; color: #000; --adventure-accent: #000; }
+.generative-mascot { display: block; font-size: 56px; margin-bottom: 12px; }
+.generative-choices { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; margin: 20px 0; }
+.generative-choice { flex: 1 1 120px; max-width: 220px; min-width: 100px; min-height: 100px; border: 3px solid var(--adventure-accent); border-radius: 20px; background: white; padding: 12px; color: #192c25; }
+.generative-choice img, .generative-visual img { width: 100%; height: 160px; object-fit: contain; }
+.generative-visual { max-width: 280px; margin: 20px auto; }
+.generative-learning button { min-height: 48px; min-width: 48px; }
+.generative-learning button:focus-visible { outline: 4px solid #111; outline-offset: 4px; }
+.generative-note { text-align: center; }
+.generative-inspector { margin: 24px; }
+.generative-inspector pre { overflow: auto; max-height: 320px; }
+.generative-choice svg, .generative-visual svg { width: 100%; height: 160px; }
+.generative-reward { animation: adventure-celebrate 900ms ease-out 1; }
+.generative-reward[data-reward="rocket"], .generative-reward[data-reward="balloons"] { animation-name: adventure-rise; }
+@keyframes adventure-celebrate { 0% { transform: scale(.7); } 60% { transform: scale(1.15) rotate(8deg); } 100% { transform: scale(1); } }
+@keyframes adventure-rise { 0% { transform: translateY(32px); opacity: .3; } 100% { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .generative-reward { animation: none; } }
+.generative-drop-target { border: 3px dashed var(--adventure-accent); border-radius: 24px; min-height: 140px; padding: 24px; margin: 16px 0; }
+.generative-drop-target > span { font-size: 48px; }
+.generative-scene { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 24px; background: linear-gradient(#e6f6ff 0 55%, #e4f1d7 55%); padding: 20px; }
+.generative-scene .generative-choice { justify-self: center; width: 100%; }
