@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { aiConfiguration } from "@/lib/ai/provider";
+import { lessonSchema } from "@/lib/generative/domain";
 import { readPlan } from "@/lib/adventure/plan";
 import { db } from "@/lib/db";
 import { apiError } from "@/lib/db/http";
@@ -46,6 +47,62 @@ export async function GET() {
         include: { cards: { orderBy: { sequence: "asc" } } },
       }),
     ]);
+    const generativeEnabled = process.env.GENERATIVE_UI_ENABLED === "true";
+    const [generativeResume, generativeCompleted, generativeSeen] =
+      generativeEnabled
+        ? await Promise.all([
+            db.generativeLessonRecord.findFirst({
+              where: {
+                childId: profile.id,
+                completedAt: null,
+                language: { in: profile.enabledLanguages },
+              },
+              orderBy: { createdAt: "desc" },
+              include: { results: { select: { id: true } } },
+            }),
+            db.generativeLessonRecord.count({
+              where: { childId: profile.id, completedAt: { not: null } },
+            }),
+            db.generativeActivityResult.count({
+              where: { lesson: { childId: profile.id } },
+            }),
+          ])
+        : ([null, 0, 0] as const);
+    const parsedGenerative = lessonSchema.safeParse(generativeResume?.lesson);
+    const approvedIds = new Set(
+      concepts
+        .filter(
+          (c) =>
+            c.active &&
+            c.translations.some(
+              (t) => t.language === generativeResume?.language,
+            ),
+        )
+        .map((c) => c.id),
+    );
+    const nextGenerativeIndex = parsedGenerative.success
+      ? parsedGenerative.data.activities.findIndex(
+          (a) => !generativeResume?.results.some((r) => r.id === a.activityId),
+        )
+      : -1;
+    const resumeGenerativeLesson =
+      generativeResume &&
+      parsedGenerative.success &&
+      parsedGenerative.data.activities.every((a) =>
+        [
+          a.wordId,
+          ...("choices" in a ? a.choices : "wordIds" in a ? a.wordIds : []),
+        ].every((id) => approvedIds.has(id)),
+      )
+        ? {
+            lesson: parsedGenerative.data,
+            language: generativeResume.language,
+            resumeIndex:
+              nextGenerativeIndex < 0
+                ? parsedGenerative.data.activities.length - 1
+                : nextGenerativeIndex,
+          }
+        : null;
     const adventurePlan = resume?.adventurePlan
       ? readPlan(resume.adventurePlan, resume.cards, concepts)
       : null;
@@ -58,6 +115,8 @@ export async function GET() {
       );
     return NextResponse.json(
       {
+        generativeUIEnabled: generativeEnabled,
+        resumeGenerativeLesson,
         profile,
         categories,
         concepts,
@@ -66,7 +125,10 @@ export async function GET() {
         ai: aiConfiguration(),
         account: { name: user.name, email: user.email, role: user.role },
         security: { configured: true, legacyPinRequired: false },
-        progressSummary: { sessionsCompleted: completed, cardsSeen },
+        progressSummary: {
+          sessionsCompleted: completed + generativeCompleted,
+          cardsSeen: cardsSeen + generativeSeen,
+        },
         resumeSession: usable
           ? {
               id: resume.id,
